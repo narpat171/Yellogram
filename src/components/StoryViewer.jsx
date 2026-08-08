@@ -147,7 +147,14 @@ export default function StoryViewer({ groupedStories, initialUserIndex = 0, curr
   const deleteCurrentStory = async () => {
     if (!isOwnStory || !currentStory || isDeleting) return;
 
+    if (!window.confirm('Delete this story?')) return;
     setIsDeleting(true);
+
+    const storagePath = currentStory.media_url?.split('/object/public/')[1]?.split('?')[0];
+    if (storagePath) {
+      await supabase.storage.from('yellowgram_uploads').remove([storagePath]);
+    }
+
     const { error } = await supabase
       .from('stories')
       .delete()
@@ -159,8 +166,19 @@ export default function StoryViewer({ groupedStories, initialUserIndex = 0, curr
       return alert(`Story could not be deleted: ${error.message}`);
     }
 
+    setMenuOpen(false);
+    setSyncedProgress(0);
     onStoryDeleted?.(currentStory.id);
-    onClose();
+
+    if (storyIndex < currentStoriesList.length - 1) {
+      setStoryIndex((value) => value + 1);
+    } else if (userIndex < groupedStories.length - 1) {
+      setUserIndex((value) => value + 1);
+      setStoryIndex(0);
+    } else {
+      onClose();
+    }
+    setIsDeleting(false);
   };
 
   useEffect(() => {
