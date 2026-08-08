@@ -251,7 +251,7 @@ export default function MusicPicker({ onSelect, onClose }) {
                 <p className="text-white font-bold text-sm truncate">{song.trackName}</p>
                 <p className="text-white/50 text-xs truncate">{song.artistName} · {song.collectionName || song.primaryGenreName}</p>
               </div>
-              <button onClick={() => onSelect(`${song.trackName} - ${song.artistName}`)} className="text-gray-900 font-black text-sm bg-yellow-400 hover:bg-yellow-500 active:scale-95 px-4 py-2 rounded-full transition-all flex-shrink-0">
+              <button onClick={() => onSelect({ name: `${song.trackName} - ${song.artistName}`, url: song.previewUrl })} className="text-gray-900 font-black text-sm bg-yellow-400 hover:bg-yellow-500 active:scale-95 px-4 py-2 rounded-full transition-all flex-shrink-0">
                 Add
               </button>
             </div>
