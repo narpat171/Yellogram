@@ -90,6 +90,8 @@ export default function MusicPicker({ onSelect, onClose }) {
   const [error, setError] = useState('');
   const [playingUrl, setPlayingUrl] = useState('');
   const [activeArtist, setActiveArtist] = useState(null);
+  const [cropSong, setCropSong] = useState(null);
+  const [cropStart, setCropStart] = useState(0);
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -141,10 +143,82 @@ export default function MusicPicker({ onSelect, onClose }) {
     audio.onended = () => setPlayingUrl('');
   };
 
+  const openCrop = song => {
+    setCropSong(song);
+    setCropStart(0);
+    setPlayingUrl('');
+  };
+
+  const toggleCropPlay = () => {
+    if (!cropSong) return;
+    if (playingUrl) {
+      audioRef.current?.pause();
+      setPlayingUrl('');
+      return;
+    }
+    if (audioRef.current) audioRef.current.pause();
+    const audio = new Audio(cropSong.previewUrl);
+    audio.currentTime = cropStart;
+    audioRef.current = audio;
+    audio.play().then(() => setPlayingUrl(cropSong.previewUrl)).catch(() => {});
+    audio.onended = () => setPlayingUrl('');
+  };
+
+  const handleCropDone = () => {
+    onSelect({ name: `${cropSong.trackName} - ${cropSong.artistName}`, url: cropSong.previewUrl, start: Math.round(cropStart * 100) / 100 });
+  };
+
+  const formatTime = s => {
+    const sec = Math.max(0, Math.floor(s));
+    return `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+  };
+
   const languageTab = LANGUAGE_TABS.find(t => t.id === tab);
 
   return (
     <div className="absolute inset-0 bg-[#121212]/95 z-[100] flex flex-col animate-in fade-in duration-200">
+      {cropSong ? (
+        <div className="flex-1 flex flex-col">
+          <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
+            <button onClick={() => { setCropSong(null); setPlayingUrl(''); }} className="text-white hover:text-gray-300 active:scale-90 transition-transform"><X className="w-7 h-7" /></button>
+            <p className="text-white font-bold text-sm flex-1">Crop song</p>
+            <button onClick={handleCropDone} className="text-gray-900 font-black text-sm bg-yellow-400 hover:bg-yellow-500 active:scale-95 px-5 py-2 rounded-full transition-all">
+              Done
+            </button>
+          </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center px-6">
+            {cropSong.artworkUrl100 && (
+              <img src={cropSong.artworkUrl100} alt="" className="w-40 h-40 rounded-2xl object-cover shadow-2xl" />
+            )}
+            <p className="text-white font-bold mt-5 text-center">{cropSong.trackName}</p>
+            <p className="text-white/50 text-sm text-center mb-8">{cropSong.artistName}</p>
+
+            <button onClick={toggleCropPlay} className="w-16 h-16 rounded-full bg-yellow-400 text-gray-900 flex items-center justify-center active:scale-90 transition-all shadow-lg">
+              {playingUrl ? <Pause className="w-7 h-7" fill="currentColor" /> : <Play className="w-7 h-7 ml-1" fill="currentColor" />}
+            </button>
+            <p className="text-white/60 text-xs mt-3 font-bold">{playingUrl ? 'Preview from crop point' : 'Tap to preview from crop point'}</p>
+
+            <div className="w-full mt-8">
+              <div className="flex justify-between text-white/60 text-xs font-bold mb-2">
+                <span>{formatTime(cropStart)}</span>
+                <span>30</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="28"
+                step="0.5"
+                value={cropStart}
+                onChange={e => { setCropStart(Number(e.target.value)); if (audioRef.current && !audioRef.current.paused) { audioRef.current.pause(); setPlayingUrl(''); } }}
+                className="w-full accent-yellow-400"
+              />
+              <p className="text-white/40 text-xs mt-2 text-center">Song ise point se start hoga</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
         <button onClick={activeArtist ? () => { setActiveArtist(null); setResults([]); } : onClose} className="text-white hover:text-gray-300 active:scale-90 transition-transform">
           {activeArtist ? <ChevronLeft className="w-7 h-7" /> : <X className="w-7 h-7" />}
@@ -251,13 +325,15 @@ export default function MusicPicker({ onSelect, onClose }) {
                 <p className="text-white font-bold text-sm truncate">{song.trackName}</p>
                 <p className="text-white/50 text-xs truncate">{song.artistName} · {song.collectionName || song.primaryGenreName}</p>
               </div>
-              <button onClick={() => onSelect({ name: `${song.trackName} - ${song.artistName}`, url: song.previewUrl })} className="text-gray-900 font-black text-sm bg-yellow-400 hover:bg-yellow-500 active:scale-95 px-4 py-2 rounded-full transition-all flex-shrink-0">
+              <button onClick={() => openCrop(song)} className="text-gray-900 font-black text-sm bg-yellow-400 hover:bg-yellow-500 active:scale-95 px-4 py-2 rounded-full transition-all flex-shrink-0">
                 Add
               </button>
             </div>
           ))
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

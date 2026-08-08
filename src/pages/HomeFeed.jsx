@@ -81,6 +81,7 @@ export default function HomeFeed() {
   const [activeFilter, setActiveFilter] = useState('none');
   const [music, setMusic] = useState('');
   const [musicUrl, setMusicUrl] = useState('');
+  const [musicStart, setMusicStart] = useState(0);
   const [isCloseFriends, setIsCloseFriends] = useState(false);
   
   const [showTextMenu, setShowTextMenu] = useState(false);
@@ -310,7 +311,7 @@ export default function HomeFeed() {
     const file = e.target.files[0];
     if (!file) return;
     setEditingFile(file); setMediaPreviewUrl(URL.createObjectURL(file));
-    setOverlays([]); setActiveFilter('none'); setMusic(''); setMusicUrl(''); setIsCloseFriends(false);
+    setOverlays([]); setActiveFilter('none'); setMusic(''); setMusicUrl(''); setMusicStart(0); setIsCloseFriends(false);
     setEditorOpen(true);
   };
 
@@ -330,7 +331,7 @@ export default function HomeFeed() {
 
       const { data: urlData } = supabase.storage.from('yellowgram_uploads').getPublicUrl(fileName);
       const { error: dbError } = await supabase.from('stories').insert({
-        user_id: currentUserId, media_url: urlData.publicUrl, filter: activeFilter, music: music, music_url: musicUrl || null, is_close_friends: isCloseFriends
+        user_id: currentUserId, media_url: urlData.publicUrl, filter: activeFilter, music: music, music_url: musicUrl || null, music_start: musicStart || 0, is_close_friends: isCloseFriends
       });
       if (dbError) throw dbError;
       await fetchStories(currentUser, followedUsers);
@@ -445,7 +446,7 @@ export default function HomeFeed() {
           )}
 
           {showMusicPicker && (
-            <MusicPicker onClose={() => setShowMusicPicker(false)} onSelect={(song) => { setMusic(song.name); setMusicUrl(song.url || ''); setShowMusicPicker(false); }} />
+            <MusicPicker onClose={() => setShowMusicPicker(false)} onSelect={(song) => { setMusic(song.name); setMusicUrl(song.url || ''); setMusicStart(song.start || 0); setShowMusicPicker(false); }} />
           )}
 
           <div className="bg-black/80 backdrop-blur-xl py-4 px-5 z-20 flex items-center justify-between border-t border-white/10 absolute bottom-0 w-full rounded-t-[30px]">
