@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Search, X, Play, Pause, Loader2 } from 'lucide-react';
 
 const TRENDING = [
+  'Dhanda Nyoliwala', 'Masoom Sharma', 'Amanraj Gill', 'KD Desi Rock',
   'Arijit Singh', 'Badshah', 'AR Rahman', 'Sidhu Moose Wala', 'Anirudh Ravichander',
   'Diljit Dosanjh', 'Taylor Swift', 'Shreya Ghoshal', 'Dua Lipa', 'Neha Kakkar',
   'Ed Sheeran', 'Jubin Nautiyal', 'The Weeknd', 'Karan Aujla', 'Pritam',
