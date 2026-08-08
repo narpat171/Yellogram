@@ -8,23 +8,69 @@ const TRENDING = [
   'Ed Sheeran', 'Jubin Nautiyal', 'The Weeknd', 'Karan Aujla', 'Pritam',
 ];
 
-const HARYANVI_ARTISTS = [
-  'Khasa Aala Chahar', 'Gulzaar Chhaniwala', 'Mister Lehri', 'A K Atish',
-  'Dhanda Nyoliwala', 'Masoom Sharma', 'Amanraj Gill', 'KD Desi Rock',
-  'Sumit Goswami', 'Manisha Sharma', 'R Dayal', 'Raj Mawar',
-  'Monu Gurjar', 'R K Rathore', 'Manish Mahen', 'Firdaus',
-  'Sapna Choudhary', 'Rohit Sardana', 'Nanna Maliya', 'Parveen Kaushik',
-];
-
-const HINDI_ARTISTS = [
-  'Arijit Singh', 'Shreya Ghoshal', 'Jubin Nautiyal', 'Atif Aslam',
-  'Armaan Malik', 'Darshan Raval', 'Kishore Kumar', 'Mohammed Rafi',
-  'Lata Mangeshkar', 'Asha Bhosle', 'Kumar Sanu', 'Udit Narayan',
-  'Alka Yagnik', 'Sonu Nigam', 'Mika Singh', 'Yo Yo Honey Singh',
-  'Badshah', 'Neha Kakkar', 'Sunidhi Chauhan', 'KK',
-  'Mohit Chauhan', 'Amit Trivedi', 'Vishal Mishra', 'Shankar Mahadevan',
-  'Pritam', 'Sachin Jigar', 'Ajay-Atul', 'Vishal Dadlani',
-  'Raftaar', 'B Praak', 'Jass Manak', 'Guru Randhawa',
+const LANGUAGE_TABS = [
+  { id: 'hindi', label: 'Hindi', emoji: '🇮🇳', artists: [
+    'Arijit Singh', 'Shreya Ghoshal', 'Jubin Nautiyal', 'Atif Aslam',
+    'Armaan Malik', 'Darshan Raval', 'Kishore Kumar', 'Mohammed Rafi',
+    'Lata Mangeshkar', 'Asha Bhosle', 'Kumar Sanu', 'Udit Narayan',
+    'Alka Yagnik', 'Sonu Nigam', 'Mika Singh', 'Yo Yo Honey Singh',
+    'Badshah', 'Neha Kakkar', 'Sunidhi Chauhan', 'KK',
+    'Mohit Chauhan', 'Amit Trivedi', 'Vishal Mishra', 'Shankar Mahadevan',
+    'Pritam', 'Sachin Jigar', 'Ajay-Atul', 'Vishal Dadlani',
+    'Raftaar', 'B Praak', 'Jass Manak', 'Guru Randhawa',
+  ]},
+  { id: 'punjabi', label: 'Punjabi', emoji: '🪔', artists: [
+    'Sidhu Moose Wala', 'Diljit Dosanjh', 'Karan Aujla', 'AP Dhillon',
+    'Honey Singh', 'Ammy Virk', 'Harbhajan Mann', 'Surjit Bindrakhia',
+    'Gurdas Maan', 'Balkar Sidhu', 'Garry Sandhu', 'Kulwinder Billa',
+    'Sharry Maan', 'Neha Kakkar', 'Amar Singh Chamkila', 'Babbu Maan',
+  ]},
+  { id: 'haryanvi', label: 'Haryanvi', emoji: '🐪', artists: [
+    'Khasa Aala Chahar', 'Gulzaar Chhaniwala', 'Mister Lehri', 'A K Atish',
+    'Dhanda Nyoliwala', 'Masoom Sharma', 'Amanraj Gill', 'KD Desi Rock',
+    'Sumit Goswami', 'Manisha Sharma', 'R Dayal', 'Raj Mawar',
+    'Monu Gurjar', 'R K Rathore', 'Manish Mahen', 'Firdaus',
+    'Sapna Choudhary', 'Rohit Sardana', 'Nanna Maliya', 'Parveen Kaushik',
+  ]},
+  { id: 'tamil', label: 'Tamil', emoji: '🇮🇳', artists: [
+    'Anirudh Ravichander', 'AR Rahman', 'Ilaiyaraaja', 'S.P. Balasubrahmanyam',
+    'GV Prakash', 'Yuvan Shankar Raja', 'Vijay Yesudas', 'Hiphop Tamizha',
+    'Santhosh Narayanan', 'Deva', 'Harris Jayaraj', 'A.R. Rahman',
+  ]},
+  { id: 'telugu', label: 'Telugu', emoji: '🇮🇳', artists: [
+    'Devi Sri Prasad', 'Mani Sharma', 'M.M. Keeravani', 'Thaman S',
+    'Ilaiyaraaja', 'Vijay Prakash', 'Kalyani Malik', 'Ram Sampath',
+  ]},
+  { id: 'malayalam', label: 'Malayalam', emoji: '🇮🇳', artists: [
+    'Vineeth Sreenivasan', 'Vidyasagar', 'Gopi Sundar', 'Ranjin Raj',
+    'Shankar Mahadevan', 'Sushin Shyam', 'Deepak Dev',
+  ]},
+  { id: 'kannada', label: 'Kannada', emoji: '🇮🇳', artists: [
+    'Hamsalekha', 'V. Harikrishna', 'Arjun Janya', 'Raghu Dixit',
+    'Sonu Nigam', 'Vijay Prakash',
+  ]},
+  { id: 'marathi', label: 'Marathi', emoji: '🇮🇳', artists: [
+    'Ajay-Atul', 'Amitraj', 'Avadhoot Gupte', 'Shreya Ghoshal',
+    'Kavita Ramdas', 'Vaishali Samant', 'Prashant Nakti',
+  ]},
+  { id: 'bhojpuri', label: 'Bhojpuri', emoji: '🇮🇳', artists: [
+    'Khesari Lal Yadav', 'Pawan Singh', 'Dinesh Lal Yadav', 'Amit Star',
+    'Shilpi Raj', 'Neelkamal Singh', 'Anupma Yadav', 'Pramod Premi Yadav',
+  ]},
+  { id: 'gujarati', label: 'Gujarati', emoji: '🇮🇳', artists: [
+    'Aishwarya Majmudar', 'Osman Mir', 'Aditya Gadhvi', 'Manoj Desai',
+    'Jignesh Kaviraj', 'Priyam Patel',
+  ]},
+  { id: 'bengali', label: 'Bengali', emoji: '🇮🇳', artists: [
+    'Arijit Singh', 'Kumar Sanu', 'Anup Jalota', 'Kishore Kumar',
+    'Srikanta Acharya', 'Shreya Ghoshal', 'Bappi Lahiri',
+  ]},
+  { id: 'english', label: 'English', emoji: '🌍', artists: [
+    'Taylor Swift', 'Ed Sheeran', 'Dua Lipa', 'Ariana Grande',
+    'Drake', 'Justin Bieber', 'The Weeknd', 'Beyonce',
+    'Eminem', 'Coldplay', 'Post Malone', 'Billie Eilish',
+    'Imagine Dragons', 'Rihanna', 'Shawn Mendes', 'Alan Walker',
+  ]},
 ];
 
 const BHAJAN_DEVTAS = [
@@ -95,6 +141,8 @@ export default function MusicPicker({ onSelect, onClose }) {
     audio.onended = () => setPlayingUrl('');
   };
 
+  const languageTab = LANGUAGE_TABS.find(t => t.id === tab);
+
   return (
     <div className="absolute inset-0 bg-[#121212]/95 z-[100] flex flex-col animate-in fade-in duration-200">
       <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
@@ -118,11 +166,12 @@ export default function MusicPicker({ onSelect, onClose }) {
       </div>
 
       {!activeArtist && (
-        <div className="flex px-4 pt-3 gap-2 border-b border-white/10 pb-0">
-          <button onClick={() => setTab('trending')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tab === 'trending' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>Trending</button>
-          <button onClick={() => setTab('hindi')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tab === 'hindi' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>Hindi</button>
-          <button onClick={() => setTab('haryanvi')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tab === 'haryanvi' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>Haryanvi</button>
-          <button onClick={() => setTab('bhajan')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tab === 'bhajan' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>Bhajan</button>
+        <div className="flex px-4 pt-3 gap-2 border-b border-white/10 pb-0 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button onClick={() => setTab('trending')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all flex-shrink-0 ${tab === 'trending' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>🔥 Trending</button>
+          {LANGUAGE_TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`px-5 py-2 rounded-full text-sm font-bold transition-all flex-shrink-0 ${tab === t.id ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>{t.emoji} {t.label}</button>
+          ))}
+          <button onClick={() => setTab('bhajan')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all flex-shrink-0 ${tab === 'bhajan' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>🕉️ Bhajan</button>
         </div>
       )}
 
@@ -139,27 +188,10 @@ export default function MusicPicker({ onSelect, onClose }) {
         </div>
       )}
 
-      {!activeArtist && tab === 'haryanvi' && (
+      {!activeArtist && languageTab && (
         <div className="px-2 py-2 border-b border-white/10 flex-1 overflow-y-auto">
-          <p className="text-white/50 text-xs font-bold uppercase tracking-wide px-3 py-2">Haryanvi artists</p>
-          {HARYANVI_ARTISTS.map((artist, i) => (
-            <button key={i} onClick={() => openArtist(artist)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 active:bg-white/10 transition-colors rounded-xl">
-              <div className="w-11 h-11 rounded-full bg-white/10 text-yellow-400 flex items-center justify-center font-black text-lg flex-shrink-0">
-                {artist.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-white font-bold text-sm truncate">{artist}</p>
-              </div>
-              <ChevronLeft className="w-5 h-5 text-white/30 rotate-180 flex-shrink-0" />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {!activeArtist && tab === 'hindi' && (
-        <div className="px-2 py-2 border-b border-white/10 flex-1 overflow-y-auto">
-          <p className="text-white/50 text-xs font-bold uppercase tracking-wide px-3 py-2">Hindi artists</p>
-          {HINDI_ARTISTS.map((artist, i) => (
+          <p className="text-white/50 text-xs font-bold uppercase tracking-wide px-3 py-2">{languageTab.emoji} {languageTab.label} artists</p>
+          {languageTab.artists.map((artist, i) => (
             <button key={i} onClick={() => openArtist(artist)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 active:bg-white/10 transition-colors rounded-xl">
               <div className="w-11 h-11 rounded-full bg-white/10 text-yellow-400 flex items-center justify-center font-black text-lg flex-shrink-0">
                 {artist.charAt(0)}
@@ -175,7 +207,7 @@ export default function MusicPicker({ onSelect, onClose }) {
 
       {!activeArtist && tab === 'bhajan' && (
         <div className="px-2 py-2 border-b border-white/10 flex-1 overflow-y-auto">
-          <p className="text-white/50 text-xs font-bold uppercase tracking-wide px-3 py-2">Bhajan · Devtas</p>
+          <p className="text-white/50 text-xs font-bold uppercase tracking-wide px-3 py-2">🕉️ Bhajan · Devtas</p>
           {BHAJAN_DEVTAS.map((bhajan, i) => (
             <button key={i} onClick={() => openArtist(bhajan)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 active:bg-white/10 transition-colors rounded-xl">
               <div className="w-11 h-11 rounded-full bg-white/10 text-yellow-400 flex items-center justify-center text-xl flex-shrink-0">
