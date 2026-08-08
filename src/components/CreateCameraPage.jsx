@@ -1,99 +1,253 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { X, Settings, Music, Type, Wand2, RefreshCcw, Zap, ChevronLeft } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Image as ImageIcon, Loader2, RefreshCcw } from 'lucide-react';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
+import { db, auth } from '../firebase'; 
 
-export default function CreateCameraPage({ onClose, onShare, isVisible }) {
-  const [mode, setMode] = useState('post'); 
-  const [capturedMedia, setCapturedMedia] = useState(null);
+export default function CreateCameraPage({ isVisible, onClose }) {
+  const [imageBase64, setImageBase64] = useState(null); // फाइनल फोटो का कोड
   const [caption, setCaption] = useState('');
-  const [cameraError, setCameraError] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [userData, setUserData] = useState(null);
+  
+  // कैमरे के लिए
   const videoRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [stream, setStream] = useState(null);
+  const [facingMode, setFacingMode] = useState("environment"); // 'environment' मतलब बैक कैमरा, 'user' मतलब फ्रंट
 
+  // 1. यूज़र का डेटा लाना
   useEffect(() => {
-    let stream;
-    const startCamera = async () => {
-      try {
-        setCameraError(false);
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: mode === 'reel' });
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      } catch (err) {
-        setCameraError(true);
+    const fetchUser = async () => {
+      if (auth.currentUser) {
+        const docRef = doc(db, "users", auth.currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) setUserData(docSnap.data());
       }
     };
-    if (!capturedMedia) startCamera();
-    return () => { if (stream) stream.getTracks().forEach(track => track.stop()); };
-  }, [capturedMedia, mode]);
+    if (isVisible) fetchUser();
+  }, [isVisible]);
 
-  const takePhoto = () => {
-    if (videoRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth; canvas.height = videoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      setCapturedMedia(canvas.toDataURL('image/jpeg'));
+  // 2. कैमरा चालू / बंद करना
+  const startCamera = async () => {
+    try {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facingMode }
+      });
+      setStream(newStream);
+      if (videoRef.current) videoRef.current.srcObject = newStream;
+    } catch (err) {
+      console.error("Camera Error:", err);
+      alert("कैमरा चालू नहीं हो पाया। कृपया परमिशन चेक करें!");
     }
   };
 
-  const handleGalleryUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) setCapturedMedia(URL.createObjectURL(file));
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
   };
 
+  // पेज खुलते ही कैमरा चालू करना, और फोटो खींचने पर बंद करना
+  useEffect(() => {
+    if (isVisible && !imageBase64) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera(); // जब पेज बंद हो तो कैमरा भी बंद हो जाए
+  }, [isVisible, imageBase64, facingMode]);
+
+  const toggleCamera = () => {
+    setFacingMode(prev => prev === "user" ? "environment" : "user");
+  };
+
+  // 3. 🔥 लाइव फोटो क्लिक करना 🔥
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      // वीडियो की साइज़ के हिसाब से कैनवस सेट करना
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // कैनवस से फोटो का कोड (Base64) निकालना
+      const base64 = canvas.toDataURL('image/jpeg', 0.8);
+      setImageBase64(base64); // फोटो सेव हो गई
+      stopCamera();
+    }
+  };
+
+  // 4. 🔥 गैलरी से फोटो चुनना और हल्का करना (Compress) 🔥
+  const compressGalleryImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 600; 
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = img.height * scaleSize;
+          
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+      };
+    });
+  };
+
+  const handleGallerySelect = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const base64 = await compressGalleryImage(file);
+      setImageBase64(base64);
+      stopCamera();
+    }
+  };
+
+  // 5. पोस्ट को डेटाबेस में शेयर करना
+  const handleShare = async () => {
+    if (!imageBase64 || !userData) return;
+    setLoading(true);
+
+    try {
+      await addDoc(collection(db, "posts"), {
+        userId: userData.uid,
+        username: userData.username,
+        userProfilePic: userData.profilePic,
+        image: imageBase64,
+        caption: caption,
+        likes: 0,
+        createdAt: serverTimestamp()
+      });
+
+      handleClose(); // काम होने के बाद पेज बंद
+    } catch (error) {
+      console.error("Post upload error:", error);
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    stopCamera();
+    setImageBase64(null);
+    setCaption('');
+    setLoading(false);
+    onClose();
+  };
+
+  if (!isVisible) return null;
+
   return (
-    <div className={`fixed inset-0 z-[100] bg-black text-white flex flex-col font-sans h-screen w-screen overflow-hidden transition-transform duration-300 ease-out transform ${isVisible ? 'translate-y-0' : 'translate-y-full'}`}>
-      {capturedMedia ? (
-        <>
-          <div className="absolute top-0 w-full p-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/60 to-transparent">
-            <button onClick={() => setCapturedMedia(null)} className="p-2"><ChevronLeft size={32} /></button>
-            <div className="flex gap-6">
-              <Music size={28} className="cursor-pointer hover:text-yellow-400" />
-              <Type size={28} className="cursor-pointer hover:text-yellow-400" />
-              <Wand2 size={28} className="cursor-pointer hover:text-yellow-400" />
+    <div className="fixed inset-0 z-50 bg-black flex flex-col items-center animate-in fade-in duration-300 w-full h-full">
+      
+      {/* Top Bar */}
+      <div className="absolute top-0 w-full max-w-lg p-4 flex justify-between items-center text-white z-10 bg-gradient-to-b from-black/60 to-transparent pt-6">
+        <button onClick={handleClose} className="p-2 bg-black/40 rounded-full hover:bg-black/60 backdrop-blur-md">
+          <X className="w-6 h-6" />
+        </button>
+        <h2 className="text-xl font-bold">{imageBase64 ? 'New Post' : 'Camera'}</h2>
+        {imageBase64 ? (
+          <button 
+            onClick={handleShare} 
+            disabled={loading}
+            className="px-4 py-1.5 rounded-full font-bold bg-yellow-400 text-black hover:bg-yellow-500"
+          >
+            {loading ? <Loader2 className="w-5 h-5 animate-spin mx-2" /> : 'Share'}
+          </button>
+        ) : (
+          <div className="w-10"></div> /* Empty div for layout balance */
+        )}
+      </div>
+
+      {/* Main Area: Camera OR Preview */}
+      <div className="w-full h-full max-w-lg relative flex flex-col justify-center items-center bg-gray-900">
+        
+        {!imageBase64 ? (
+          <>
+            {/* 🎥 Live Camera View */}
+            <video 
+              ref={videoRef} 
+              autoPlay 
+              playsInline 
+              muted 
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Bottom Camera Controls */}
+            <div className="absolute bottom-10 w-full flex justify-around items-center px-8 z-10">
+              
+              {/* Gallery Button */}
+              <label className="p-3 bg-gray-800/80 rounded-full text-white cursor-pointer hover:bg-gray-700 backdrop-blur-sm">
+                <ImageIcon className="w-7 h-7" />
+                <input type="file" accept="image/*" onChange={handleGallerySelect} className="hidden" />
+              </label>
+
+              {/* Capture Button (Big Circle) */}
+              <button 
+                onClick={capturePhoto} 
+                className="w-20 h-20 bg-transparent border-4 border-white rounded-full flex items-center justify-center focus:outline-none"
+              >
+                <div className="w-16 h-16 bg-white rounded-full active:scale-90 transition-transform"></div>
+              </button>
+
+              {/* Flip Camera Button */}
+              <button 
+                onClick={toggleCamera} 
+                className="p-3 bg-gray-800/80 rounded-full text-white hover:bg-gray-700 backdrop-blur-sm"
+              >
+                <RefreshCcw className="w-7 h-7" />
+              </button>
+
             </div>
-          </div>
-          <div className="flex-1 w-full relative bg-gray-900 flex items-center justify-center">
-            <img src={capturedMedia} alt="Captured" className="w-full h-full object-contain" />
-          </div>
-          <div className="bg-black p-4 pb-8 flex flex-col gap-4 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-20">
-            <div className="flex items-center gap-3 bg-gray-800 p-3 rounded-2xl">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=myprofile" alt="profile" className="w-10 h-10 rounded-full bg-yellow-400" />
-              <input type="text" placeholder="Write a caption..." value={caption} onChange={(e) => setCaption(e.target.value)} className="bg-transparent flex-1 text-white focus:outline-none" />
-            </div>
-            <button onClick={() => onShare(capturedMedia, caption)} className="w-full bg-yellow-400 text-black font-extrabold text-lg py-3 rounded-2xl hover:bg-yellow-500 transition-colors shadow-lg">Share</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="absolute top-0 w-full p-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/50 to-transparent">
-            <button onClick={onClose} className="hover:scale-110 transition-transform"><X size={32} /></button>
-            <Zap size={28} className="cursor-pointer hover:text-yellow-400" />
-            <Settings size={28} className="cursor-pointer hover:text-yellow-400" />
-          </div>
-          <div className="flex-1 w-full relative bg-gray-900 rounded-b-3xl overflow-hidden flex items-center justify-center shadow-xl">
-            {cameraError ? (
-              <div className="text-center p-6"><p className="text-gray-400 mb-4">Camera access denied.</p><p className="text-yellow-400 font-bold">Please use Gallery.</p></div>
-            ) : (
-              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-            )}
-          </div>
-          <div className="h-48 bg-black flex flex-col items-center justify-center gap-6 pb-6 pt-2">
-            <div className="flex gap-6 text-sm font-bold tracking-widest text-gray-500">
-              <span onClick={() => setMode('post')} className={`cursor-pointer transition-colors ${mode === 'post' ? 'text-yellow-400' : 'hover:text-white'}`}>POST</span>
-              <span onClick={() => setMode('reel')} className={`cursor-pointer transition-colors ${mode === 'reel' ? 'text-yellow-400' : 'hover:text-white'}`}>REEL</span>
-            </div>
-            <div className="flex justify-between items-center w-full px-12">
-              <div className="w-10 h-10 overflow-hidden rounded-xl border-2 border-white cursor-pointer hover:scale-110" onClick={() => fileInputRef.current.click()}>
-                <img src="https://picsum.photos/100/100" alt="Gallery" className="w-full h-full object-cover opacity-80" />
-                <input type="file" accept="image/*,video/*" ref={fileInputRef} onChange={handleGalleryUpload} className="hidden" />
+          </>
+        ) : (
+          <>
+            {/* 🖼️ Photo Preview Area (After Clicking/Selecting) */}
+            <div className="w-full flex-1 relative flex flex-col pt-24 px-4 bg-gray-900">
+              <div className="w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-xl border border-gray-700">
+                <img src={imageBase64} alt="Preview" className="w-full h-full object-cover" />
               </div>
-              <div onClick={takePhoto} className={`w-20 h-20 rounded-full border-[4px] flex items-center justify-center cursor-pointer hover:scale-95 transition-transform ${mode === 'reel' ? 'border-red-500' : 'border-white'}`}>
-                <div className={`w-[66px] h-[66px] rounded-full ${mode === 'reel' ? 'bg-red-500' : 'bg-white'}`}></div>
+
+              {/* Caption Input */}
+              <div className="w-full mt-6 flex items-start gap-3 bg-gray-800 p-4 rounded-xl shadow-lg border border-gray-700">
+                <img 
+                  src={userData?.profilePic || 'https://api.dicebear.com/7.x/avataaars/svg?seed=fallback'} 
+                  alt="Profile" 
+                  className="w-10 h-10 rounded-full border border-gray-600 object-cover" 
+                />
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Write a caption for your post..."
+                  className="w-full bg-transparent text-white focus:outline-none resize-none min-h-[60px]"
+                  maxLength="150"
+                />
               </div>
-              <div className="w-10 h-10 flex items-center justify-center bg-gray-800 rounded-full cursor-pointer hover:bg-gray-700"><RefreshCcw size={20} className="text-white" /></div>
+
+              <button 
+                onClick={() => setImageBase64(null)} 
+                className="mt-6 text-gray-400 font-bold hover:text-white transition-colors self-center"
+              >
+                Retake Photo
+              </button>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
+
+        {/* Hidden Canvas used for capturing the frame */}
+        <canvas ref={canvasRef} className="hidden"></canvas>
+      </div>
     </div>
   );
 }
