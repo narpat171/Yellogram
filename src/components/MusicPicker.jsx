@@ -16,6 +16,14 @@ const HARYANVI_ARTISTS = [
   'Sapna Choudhary', 'Rohit Sardana', 'Nanna Maliya', 'Parveen Kaushik',
 ];
 
+const BHAJAN_DEVTAS = [
+  'Karni Mata bhajan', 'Khatu Shyam bhajan', 'Hanuman bhajan', 'Shiv bhajan',
+  'Ganesh bhajan', 'Durga Maa bhajan', 'Krishna bhajan', 'Radhe Krishna bhajan',
+  'Sai Baba bhajan', 'Om Jai Lakshmi Mata', 'Shri Ram bhajan', 'Santoshi Mata bhajan',
+  'Vaishno Devi bhajan', 'Baba Balak Nath bhajan', 'Guru Nanak shabad', 'Baba Ramdev bhajan',
+  'Jai Mata Di bhajan', 'Shirdi Sai bhajan', 'Mahadev bhajan', 'Shyam Baba bhajan',
+];
+
 export default function MusicPicker({ onSelect, onClose }) {
   const [tab, setTab] = useState('trending');
   const [query, setQuery] = useState('');
@@ -102,6 +110,7 @@ export default function MusicPicker({ onSelect, onClose }) {
         <div className="flex px-4 pt-3 gap-2 border-b border-white/10 pb-0">
           <button onClick={() => setTab('trending')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tab === 'trending' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>Trending</button>
           <button onClick={() => setTab('haryanvi')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tab === 'haryanvi' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>Haryanvi</button>
+          <button onClick={() => setTab('bhajan')} className={`px-5 py-2 rounded-full text-sm font-bold transition-all ${tab === 'bhajan' ? 'bg-yellow-400 text-gray-900' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>Bhajan</button>
         </div>
       )}
 
@@ -128,6 +137,23 @@ export default function MusicPicker({ onSelect, onClose }) {
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <p className="text-white font-bold text-sm truncate">{artist}</p>
+              </div>
+              <ChevronLeft className="w-5 h-5 text-white/30 rotate-180 flex-shrink-0" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!activeArtist && tab === 'bhajan' && (
+        <div className="px-2 py-2 border-b border-white/10 flex-1 overflow-y-auto">
+          <p className="text-white/50 text-xs font-bold uppercase tracking-wide px-3 py-2">Bhajan · Devtas</p>
+          {BHAJAN_DEVTAS.map((bhajan, i) => (
+            <button key={i} onClick={() => openArtist(bhajan)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 active:bg-white/10 transition-colors rounded-xl">
+              <div className="w-11 h-11 rounded-full bg-white/10 text-yellow-400 flex items-center justify-center text-xl flex-shrink-0">
+                🕉️
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-white font-bold text-sm truncate">{bhajan}</p>
               </div>
               <ChevronLeft className="w-5 h-5 text-white/30 rotate-180 flex-shrink-0" />
             </button>
