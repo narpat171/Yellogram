@@ -45,16 +45,7 @@ const DraggableItem = ({ item, updateItem, removeItem }) => {
   );
 };
 
-const RANK_LIKE_WEIGHT = 0.1;
-const RANK_FRESHNESS_WEIGHT = 3;
-const RANK_HALF_LIFE_HOURS = 48;
-
-const scorePost = (post) => {
-  const likes = Number(post.likes) || 0;
-  const ageHours = (Date.now() - new Date(post.created_at).getTime()) / 3600000;
-  const freshness = Math.exp(-ageHours / RANK_HALF_LIFE_HOURS);
-  return likes * RANK_LIKE_WEIGHT + freshness * RANK_FRESHNESS_WEIGHT;
-};
+const POSTS_PER_PAGE = 20;
 
 const FeedImage = ({ src, alt, className }) => {
   const [loaded, setLoaded] = useState(false);
@@ -77,6 +68,9 @@ export default function HomeFeed() {
   const [myProfilePic, setMyProfilePic] = useState('');
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const feedOffsetRef = useRef(0);
+  const feedSentinelRef = useRef(null);
   const [feedError, setFeedError] = useState('');
   const [followedUsers, setFollowedUsers] = useState({});
   const [likedPosts, setLikedPosts] = useState({});
@@ -154,6 +148,18 @@ export default function HomeFeed() {
   }, []);
 
   useEffect(() => {
+    const sentinel = feedSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMorePosts && !loading) {
+        fetchPosts(currentUser, true);
+      }
+    }, { rootMargin: '400px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMorePosts, loading, currentUser]);
+
+  useEffect(() => {
     if (!currentUser?.id) return;
     const fetchUnreadCount = async () => {
       const { data, error } = await supabase.from('messages').select('sender_id').eq('receiver_id', currentUser.id).eq('is_read', false); 
@@ -206,12 +212,19 @@ export default function HomeFeed() {
     } catch (err) { console.error("Error fetching stories:", err); }
   };
 
-  const fetchPosts = async (viewer = currentUser) => {
+  const fetchPosts = async (viewer = currentUser, loadMore = false) => {
     try {
       setFeedError('');
-      const { data, error } = await supabase.from('posts').select('*').eq('type', 'post').order('created_at', { ascending: false });
+      const start = loadMore ? feedOffsetRef.current : 0;
+      const { data, error } = await supabase
+        .from('ranked_posts')
+        .select('*')
+        .order('rank_score', { ascending: false })
+        .range(start, start + POSTS_PER_PAGE - 1);
       if (error) throw error;
       const loadedPosts = data || [];
+      feedOffsetRef.current = start + loadedPosts.length;
+      setHasMorePosts(loadedPosts.length === POSTS_PER_PAGE);
 
       const userIds = [...new Set(loadedPosts.map((post) => post.user_id).filter(Boolean))];
       const { data: userRows } = userIds.length
@@ -219,24 +232,24 @@ export default function HomeFeed() {
         : { data: [] };
       const userMap = Object.fromEntries((userRows || []).map((u) => [u.id, u]));
 
-      const scoredPosts = [...loadedPosts].sort((a, b) => scorePost(b) - scorePost(a));
-      setPosts(scoredPosts.map((post) => ({ ...post, users: userMap[post.user_id], commentsList: [] })));
+      const newPosts = loadedPosts.map((post) => ({ ...post, users: userMap[post.user_id], commentsList: [] }));
+      setPosts((prev) => (loadMore ? [...prev, ...newPosts] : newPosts));
 
       if (viewer && loadedPosts.length > 0) {
         const postIds = loadedPosts.map((post) => post.id);
-        
-        // 1. Fetch Likes
-        const { data: myLikes } = await supabase.from('post_likes').select('post_id').eq('user_id', viewer.id).in('post_id', postIds);
-        setLikedPosts(Object.fromEntries((myLikes || []).map((like) => [like.post_id, true])));
 
-        // 🔥 2. Fetch Saved Posts (ताकि पहले से सेव की हुई पोस्ट डार्क दिखें) 🔥
+        const { data: myLikes } = await supabase.from('post_likes').select('post_id').eq('user_id', viewer.id).in('post_id', postIds);
+        setLikedPosts((prev) => ({ ...prev, ...Object.fromEntries((myLikes || []).map((like) => [like.post_id, true])) }));
+
         const { data: mySaves } = await supabase.from('saved_posts').select('post_id').eq('user_id', viewer.id).in('post_id', postIds);
-        setSavedPosts(Object.fromEntries((mySaves || []).map((save) => [save.post_id, true])));
+        setSavedPosts((prev) => ({ ...prev, ...Object.fromEntries((mySaves || []).map((save) => [save.post_id, true])) }));
       }
     } catch (error) {
       console.error('Could not load posts:', error);
-      setPosts([]);
-      setFeedError(error.message || 'Posts could not be loaded.');
+      if (!loadMore) {
+        setPosts([]);
+        setFeedError(error.message || 'Posts could not be loaded.');
+      }
     } finally {
       setLoading(false);
     }
@@ -665,6 +678,12 @@ export default function HomeFeed() {
               </div>
             </article>
           ))
+        )}
+
+        {hasMorePosts && (
+          <div ref={feedSentinelRef} className="flex justify-center py-8 text-gray-400">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
         )}
       </div>
 
