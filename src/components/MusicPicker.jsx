@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, X, Play, Pause, Loader2, ChevronLeft, Check, Square, Music2, Type, Brush, Sticker } from 'lucide-react';
+import { Search, X, Play, Pause, Loader2, ChevronLeft, Check, Square } from 'lucide-react';
 
 const TRENDING = [
   'Dhanda Nyoliwala', 'Masoom Sharma', 'Amanraj Gill', 'KD Desi Rock',
@@ -92,7 +92,6 @@ export default function MusicPicker({ onSelect, onClose }) {
   const [activeArtist, setActiveArtist] = useState(null);
   const [cropSong, setCropSong] = useState(null);
   const [cropStart, setCropStart] = useState(0);
-  const [textStyle, setTextStyle] = useState('none');
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -148,14 +147,13 @@ export default function MusicPicker({ onSelect, onClose }) {
     setCropSong(song);
     setCropStart(0);
     setPlayingUrl('');
-    setTextStyle('none');
   };
 
   const cropAreaRef = useRef(null);
+  const timelineRef = useRef(null);
   const draggingRef = useRef(false);
 
-  const setCropFromClientX = clientX => {
-    const el = cropAreaRef.current;
+  const setCropFromElement = (el, clientX) => {
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
@@ -167,17 +165,17 @@ export default function MusicPicker({ onSelect, onClose }) {
     }
   };
 
-  const onCropPointerDown = e => {
+  const startDrag = e => {
     e.preventDefault();
     draggingRef.current = true;
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    setCropFromClientX(e.clientX);
+    setCropFromElement(e.currentTarget, e.clientX);
   };
-  const onCropPointerMove = e => {
+  const moveDrag = e => {
     if (!draggingRef.current) return;
-    setCropFromClientX(e.clientX);
+    setCropFromElement(e.currentTarget, e.clientX);
   };
-  const onCropPointerUp = () => { draggingRef.current = false; };
+  const endDrag = () => { draggingRef.current = false; };
 
   const closeCrop = () => { setCropSong(null); setPlayingUrl(''); draggingRef.current = false; };
 
@@ -199,8 +197,6 @@ export default function MusicPicker({ onSelect, onClose }) {
   const handleCropDone = () => {
     onSelect({ name: `${cropSong.trackName} - ${cropSong.artistName}`, url: cropSong.previewUrl, start: Math.round(cropStart * 100) / 100 });
   };
-
-  const TEXT_STYLES = [{ key: 'none', label: '🚫' }, { key: 'a', label: 'Aa' }, { key: 'ai', label: 'AI' }, { key: 'b', label: 'Aa' }];
 
   const cropBars = cropSong ? (() => {
     let seed = (Number(cropSong.trackId || 7) * 2654435761) % 233280 || 7;
@@ -226,49 +222,32 @@ export default function MusicPicker({ onSelect, onClose }) {
               <button onClick={closeCrop} className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Cancel">
                 <X className="w-5 h-5" />
               </button>
-              <div className="flex items-center gap-2">
-                <button className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Text style"><Type className="w-5 h-5" /></button>
-                <button className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Brush"><Brush className="w-5 h-5" /></button>
-                <button className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Stickers"><Sticker className="w-5 h-5" /></button>
-              </div>
               <button onClick={handleCropDone} className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-lg active:scale-90 transition-transform" aria-label="Done">
                 <Check className="w-5 h-5" strokeWidth={3} />
               </button>
             </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-white/15 backdrop-blur-md border border-white/30 flex items-center justify-center">
-                <Music2 className="w-8 h-8 text-white" />
-              </div>
-              <p className="text-white text-3xl font-bold tracking-wide">Music Only</p>
-            </div>
+            <div className="flex-1" />
 
             <div className="px-4 pb-7 space-y-5">
-              <div className="flex items-center justify-center gap-6">
-                {TEXT_STYLES.map(ts => (
-                  <button
-                    key={ts.key}
-                    onClick={() => setTextStyle(ts.key)}
-                    className={ts.key === textStyle
-                      ? 'w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-900 font-black text-base shadow-lg active:scale-90 transition-all'
-                      : 'w-10 h-10 flex items-center justify-center text-white/70 font-bold text-base active:scale-90 transition-all'}
-                  >
-                    {ts.label}
-                  </button>
-                ))}
-              </div>
-
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/25 flex items-center justify-center text-white font-black text-base">
-                  {Math.floor(cropStart)}
+                <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/25 flex items-center justify-center text-white font-black text-lg">
+                  {Math.max(0, Math.round(30 - cropStart))}
                 </div>
-                <div className="flex-1 relative h-10 flex items-center">
+                <div
+                  ref={timelineRef}
+                  onPointerDown={startDrag}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
+                  className="flex-1 relative h-10 flex items-center select-none touch-none cursor-ew-resize"
+                >
                   <div className="absolute left-0 right-0 top-1/2 h-px bg-white/30" />
-                  <div className="absolute left-0 top-1/2 h-[2.5px] -translate-y-1/2 bg-white rounded-full" style={{ width: `${(cropStart / 30) * 100}%` }} />
+                  <div className="absolute left-0 top-1/2 h-[2.5px] -translate-y-1/2 bg-yellow-400 rounded-full" style={{ width: `${(cropStart / 30) * 100}%` }} />
                   {[0.25, 0.5, 0.75].map(m => (
                     <span key={m} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full bg-pink-400" style={{ left: `${m * 100}%` }} />
                   ))}
-                  <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-white shadow-md ring-2 ring-pink-400/70" style={{ left: `${(cropStart / 30) * 100}%` }} />
+                  <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-yellow-400 shadow-md ring-2 ring-white/80" style={{ left: `${(cropStart / 30) * 100}%` }} />
                 </div>
                 <button onClick={toggleCropPlay} className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-lg active:scale-90 transition-transform" aria-label="Play preview">
                   {playingUrl ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-5 h-5 ml-0.5 fill-current" />}
@@ -277,15 +256,15 @@ export default function MusicPicker({ onSelect, onClose }) {
 
               <div
                 ref={cropAreaRef}
-                onPointerDown={onCropPointerDown}
-                onPointerMove={onCropPointerMove}
-                onPointerUp={onCropPointerUp}
-                onPointerLeave={onCropPointerUp}
-                onPointerCancel={onCropPointerUp}
+                onPointerDown={startDrag}
+                onPointerMove={moveDrag}
+                onPointerUp={endDrag}
+                onPointerLeave={endDrag}
+                onPointerCancel={endDrag}
                 className="relative h-24 select-none touch-none cursor-ew-resize"
               >
                 <div
-                  className="absolute inset-y-1 rounded-full bg-gradient-to-r from-yellow-400/70 via-orange-400/70 to-pink-500/70 border-2 border-white/60 shadow-xl pointer-events-none"
+                  className="absolute inset-y-1 bg-yellow-400/70 border-2 border-white/60 shadow-xl pointer-events-none"
                   style={{ left: `${(cropStart / 30) * 100}%`, width: `${((30 - cropStart) / 30) * 100}%` }}
                 />
                 <div className="absolute inset-0 flex items-end gap-[3px] px-1 pb-1.5">
