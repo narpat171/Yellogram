@@ -401,9 +401,9 @@ export default function HomeFeed() {
               </button>
             </div>
           </div>
-          <input type="file" ref={fileInputRef} accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
           <span className="text-[12px] font-bold text-gray-500 mt-1">Your story</span>
         </div>
+        <input type="file" ref={fileInputRef} accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
 
         {displayStoryGroups.map((group, i) => (
           <div key={group.user_id || i} onClick={() => { setSelectedUserIndex(i); setViewerOpen(true); }} className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0 group">
