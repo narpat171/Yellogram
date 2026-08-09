@@ -181,10 +181,17 @@ export default function HomeFeed() {
   const fetchPosts = async (viewer = currentUser) => {
     try {
       setFeedError('');
-      const { data, error } = await supabase.from('posts').select('*, users:user_id ( username, profile_pic )').eq('type', 'post').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('posts').select('*').eq('type', 'post').order('created_at', { ascending: false });
       if (error) throw error;
       const loadedPosts = data || [];
-      setPosts(loadedPosts.map((post) => ({ ...post, commentsList: [] })));
+
+      const userIds = [...new Set(loadedPosts.map((post) => post.user_id).filter(Boolean))];
+      const { data: userRows } = userIds.length
+        ? await supabase.from('users').select('id, username, profile_pic').in('id', userIds)
+        : { data: [] };
+      const userMap = Object.fromEntries((userRows || []).map((u) => [u.id, u]));
+
+      setPosts(loadedPosts.map((post) => ({ ...post, users: userMap[post.user_id], commentsList: [] })));
 
       if (viewer && loadedPosts.length > 0) {
         const postIds = loadedPosts.map((post) => post.id);
