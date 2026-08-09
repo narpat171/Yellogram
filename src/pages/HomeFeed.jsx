@@ -45,6 +45,17 @@ const DraggableItem = ({ item, updateItem, removeItem }) => {
   );
 };
 
+const RANK_LIKE_WEIGHT = 0.1;
+const RANK_FRESHNESS_WEIGHT = 3;
+const RANK_HALF_LIFE_HOURS = 48;
+
+const scorePost = (post) => {
+  const likes = Number(post.likes) || 0;
+  const ageHours = (Date.now() - new Date(post.created_at).getTime()) / 3600000;
+  const freshness = Math.exp(-ageHours / RANK_HALF_LIFE_HOURS);
+  return likes * RANK_LIKE_WEIGHT + freshness * RANK_FRESHNESS_WEIGHT;
+};
+
 const FeedImage = ({ src, alt, className }) => {
   const [loaded, setLoaded] = useState(false);
   return (
@@ -208,7 +219,8 @@ export default function HomeFeed() {
         : { data: [] };
       const userMap = Object.fromEntries((userRows || []).map((u) => [u.id, u]));
 
-      setPosts(loadedPosts.map((post) => ({ ...post, users: userMap[post.user_id], commentsList: [] })));
+      const scoredPosts = [...loadedPosts].sort((a, b) => scorePost(b) - scorePost(a));
+      setPosts(scoredPosts.map((post) => ({ ...post, users: userMap[post.user_id], commentsList: [] })));
 
       if (viewer && loadedPosts.length > 0) {
         const postIds = loadedPosts.map((post) => post.id);
