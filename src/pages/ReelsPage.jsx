@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Music, Volume2, VolumeX, Camera, X } from 'lucide-react';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Music, Volume2, VolumeX, Camera, X, Loader2 } from 'lucide-react';
 import { supabase } from '../supabase'; 
 import Skeleton from '../components/Skeleton';
 
@@ -24,6 +24,8 @@ const formatCount = (count) => {
   if (count >= 1000) return (count / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   return count;
 };
+
+const REELS_PER_PAGE = 10;
 
 // 🔥 सिंगल रील कॉम्पोनेंट 🔥
 const Reel = ({ reel, onLikeToggle, currentUser, isFollowing, onFollowToggle, onOpenComments }) => {
@@ -194,6 +196,9 @@ export default function ReelsPage() {
   const [followedUsers, setFollowedUsers] = useState({});
   const [reels, setReels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasMoreReels, setHasMoreReels] = useState(true);
+  const reelsOffsetRef = useRef(0);
+  const reelsSentinelRef = useRef(null);
   const [commentsSheetReel, setCommentsSheetReel] = useState(null);
   const [reelComments, setReelComments] = useState({});
   const [reelCommentDrafts, setReelCommentDrafts] = useState({});
@@ -221,28 +226,45 @@ export default function ReelsPage() {
     initializeReels();
   }, []);
 
-  const fetchReels = async () => {
+  const fetchReels = async (loadMore = false) => {
     try {
+      const start = loadMore ? reelsOffsetRef.current : 0;
       const { data, error } = await supabase
-        .from('posts')
+        .from('ranked_reels')
         .select('*')
-        .eq('type', 'reel')
-        .order('created_at', { ascending: false });
+        .order('rank_score', { ascending: false })
+        .range(start, start + REELS_PER_PAGE - 1);
 
       if (error) throw error;
-      
-      if (data && data.length > 0) {
-        setReels(data);
-      } else {
+
+      const loaded = data || [];
+      reelsOffsetRef.current = start + loaded.length;
+      setHasMoreReels(loaded.length === REELS_PER_PAGE);
+
+      if (loaded.length > 0) {
+        setReels((prev) => (loadMore ? [...prev, ...loaded] : loaded));
+      } else if (!loadMore) {
         setReels(dummyReels);
       }
     } catch (error) {
       console.error("Error fetching reels:", error.message);
-      setReels(dummyReels);
+      if (!loadMore) setReels(dummyReels);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const sentinel = reelsSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMoreReels && !loading) {
+        fetchReels(true);
+      }
+    }, { rootMargin: '600px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreReels, loading]);
 
   // 🚀 🔥 Reels के लिए असली Follow / Unfollow फंक्शन 🔥 🚀
   const handleFollowToggle = async (targetUserId) => {
@@ -384,6 +406,12 @@ export default function ReelsPage() {
             onOpenComments={openReelComments}
           />
         ))
+      )}
+
+      {hasMoreReels && (
+        <div ref={reelsSentinelRef} className="flex justify-center py-8">
+          <Loader2 className="w-7 h-7 animate-spin text-gray-500" />
+        </div>
       )}
 
       {commentsSheetReel !== null && (
