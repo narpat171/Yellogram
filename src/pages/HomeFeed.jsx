@@ -330,8 +330,9 @@ export default function HomeFeed() {
       if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage.from('yellowgram_uploads').getPublicUrl(fileName);
+      const storyDurationMs = musicUrl ? Math.max(1000, (30 - (musicStart || 0)) * 1000) : null;
       const { error: dbError } = await supabase.from('stories').insert({
-        user_id: currentUserId, media_url: urlData.publicUrl, filter: activeFilter, music: music, music_url: musicUrl || null, music_start: musicStart || 0, is_close_friends: isCloseFriends
+        user_id: currentUserId, media_url: urlData.publicUrl, filter: activeFilter, music: music, music_url: musicUrl || null, music_start: musicStart || 0, duration_ms: storyDurationMs, is_close_friends: isCloseFriends
       });
       if (dbError) throw dbError;
       await fetchStories(currentUser, followedUsers);
