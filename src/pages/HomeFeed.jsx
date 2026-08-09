@@ -181,7 +181,7 @@ export default function HomeFeed() {
   const fetchPosts = async (viewer = currentUser) => {
     try {
       setFeedError('');
-      const { data, error } = await supabase.from('posts').select('*').eq('type', 'post').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('posts').select('*, users:user_id ( username, profile_pic )').eq('type', 'post').order('created_at', { ascending: false });
       if (error) throw error;
       const loadedPosts = data || [];
       setPosts(loadedPosts.map((post) => ({ ...post, commentsList: [] })));
@@ -501,7 +501,7 @@ export default function HomeFeed() {
             </div>
             {[...Array(3)].map((_, i) => (
               <div key={i} className="bg-white rounded-xl overflow-hidden shadow-sm">
-                <div className="flex items-center gap-3 px-4 py-3"><Skeleton className="w-10 h-10 rounded-full" /><Skeleton className="w-32 h-4" /></div>
+                <div className="flex items-center gap-3 px-4 py-3"><Skeleton className="w-10 h-10 rounded-lg" /><Skeleton className="w-32 h-4" /></div>
                 <Skeleton className="w-full aspect-square rounded-none" />
                 <div className="p-4 flex flex-col gap-2"><Skeleton className="w-16 h-4" /><Skeleton className="w-40 h-4" /></div>
               </div>
@@ -522,13 +522,13 @@ export default function HomeFeed() {
                   <img
                     src={post.users?.profile_pic || post.user_profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user_id}`}
                     alt=""
-                    className="h-10 w-10 rounded-full object-cover bg-gray-100"
+                    className="h-10 w-10 rounded-lg object-cover bg-gray-100"
                   />
                   <span 
                     className="font-bold mr-1 cursor-pointer hover:underline"
                     onClick={(e) => { e.stopPropagation(); navigate(`/profile/${post.user_id}`); }}
                   >
-                    {post.username || 'User'}
+                    {post.users?.username || post.username || 'User'}
                   </span>
 
                   {/* 🔥 POST FOLLOW BUTTON 🔥 */}
