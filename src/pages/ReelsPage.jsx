@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Music, Volume2, VolumeX, Camera } from 'lucide-react';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Music, Volume2, VolumeX, Camera, X } from 'lucide-react';
 import { supabase } from '../supabase'; 
 import Skeleton from '../components/Skeleton';
 
@@ -25,7 +25,7 @@ const formatCount = (count) => {
 };
 
 // 🔥 सिंगल रील कॉम्पोनेंट 🔥
-const Reel = ({ reel, onLikeToggle, currentUser, isFollowing, onFollowToggle }) => {
+const Reel = ({ reel, onLikeToggle, currentUser, isFollowing, onFollowToggle, onOpenComments }) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true); 
@@ -160,7 +160,7 @@ const Reel = ({ reel, onLikeToggle, currentUser, isFollowing, onFollowToggle }) 
           </div>
 
           <div className="flex flex-col items-center gap-1">
-            <button className="active:scale-90 transition-transform">
+            <button onClick={() => onOpenComments(reel)} className="active:scale-90 transition-transform">
               <MessageCircle className="w-8 h-8 text-white" strokeWidth={2} />
             </button>
             <span className="text-white text-[13px] font-extrabold">{formatCount(reel.comments)}</span>
@@ -192,6 +192,9 @@ export default function ReelsPage() {
   const [followedUsers, setFollowedUsers] = useState({});
   const [reels, setReels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [commentsSheetReel, setCommentsSheetReel] = useState(null);
+  const [reelComments, setReelComments] = useState({});
+  const [reelCommentDrafts, setReelCommentDrafts] = useState({});
 
   useEffect(() => {
     const initializeReels = async () => {
@@ -282,6 +285,43 @@ export default function ReelsPage() {
     }
   };
 
+  const loadReelComments = async (reelId) => {
+    const { data, error } = await supabase.from('post_comments').select('*').eq('post_id', reelId).order('created_at', { ascending: true });
+    if (error) return alert(error.message);
+    const comments = data || [];
+    const userIds = [...new Set(comments.map((comment) => comment.user_id).filter(Boolean))];
+    const { data: userRows } = userIds.length
+      ? await supabase.from('users').select('id, profile_pic').in('id', userIds)
+      : { data: [] };
+    const picMap = Object.fromEntries((userRows || []).map((user) => [user.id, user.profile_pic]));
+    setReelComments((value) => ({ ...value, [reelId]: comments.map((comment) => ({ ...comment, avatar: picMap[comment.user_id] })) }));
+  };
+
+  const openReelComments = (reel) => {
+    setCommentsSheetReel(reel);
+    loadReelComments(reel.id);
+  };
+
+  const submitReelComment = async (event, reel) => {
+    event.preventDefault();
+    const content = (reelCommentDrafts[reel.id] || '').trim();
+    if (!content) return;
+    if (!currentUser) return alert('Please log in to comment.');
+
+    const { data, error } = await supabase.from('post_comments').insert({
+      post_id: reel.id, user_id: currentUser.id, username: currentUser.email?.split('@')[0] || 'User', content,
+    }).select().single();
+
+    if (error) return alert(error.message);
+    setReelCommentDrafts((value) => ({ ...value, [reel.id]: '' }));
+    setReelComments((value) => ({ ...value, [reel.id]: [...(value[reel.id] || []), { ...data, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}` }] }));
+    setReels((value) => value.map((item) => item.id === reel.id ? { ...item, comments: (Number(item.comments) || 0) + 1 } : item));
+
+    if (reel.user_id !== currentUser.id) {
+      supabase.from('notifications').insert({ user_id: reel.user_id, sender_id: currentUser.id, post_id: reel.id, type: 'message', content: `commented: "${content}"` }).then();
+    }
+  };
+
   return (
     <div className="bg-black w-full h-[100dvh] overflow-y-scroll snap-y snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] relative">
       
@@ -313,8 +353,38 @@ export default function ReelsPage() {
             currentUser={currentUser}
             isFollowing={followedUsers[reel.user_id]}
             onFollowToggle={handleFollowToggle}
+            onOpenComments={openReelComments}
           />
         ))
+      )}
+
+      {commentsSheetReel !== null && (
+        <div className="fixed inset-0 z-[210] bg-black/60 flex items-end justify-center" onClick={() => setCommentsSheetReel(null)}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl flex flex-col max-h-[80vh] animate-in slide-in-from-bottom-full duration-300" onClick={(event) => event.stopPropagation()}>
+            <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-black text-gray-900">{Number(commentsSheetReel.comments) || 0} comments</h3>
+              <button onClick={() => setCommentsSheetReel(null)} className="p-1 active:scale-90 transition-transform" aria-label="Close comments"><X className="w-6 h-6 text-gray-500" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3">
+              {(reelComments[commentsSheetReel.id] || []).map((comment) => (
+                <div key={comment.id} className="flex items-start gap-3 py-2.5">
+                  <img src={comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`} alt="" className="h-9 w-9 rounded-full object-cover bg-gray-100" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-bold text-sm mr-1">{comment.username || 'User'}</span>
+                    <span className="text-sm text-gray-800 break-words">{comment.content}</span>
+                  </div>
+                </div>
+              ))}
+              {(reelComments[commentsSheetReel.id] || []).length === 0 && <p className="py-8 text-center text-gray-400 font-bold">No comments yet</p>}
+            </div>
+            <div className="border-t border-gray-100 px-4 py-3">
+              <form onSubmit={(event) => submitReelComment(event, commentsSheetReel)} className="flex items-center gap-2">
+                <input value={reelCommentDrafts[commentsSheetReel.id] || ''} onChange={(event) => setReelCommentDrafts((value) => ({ ...value, [commentsSheetReel.id]: event.target.value }))} maxLength={1000} placeholder="Add a comment..." autoFocus className="flex-1 rounded-full bg-gray-100 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+                <button type="submit" className="font-bold text-sm text-blue-600 disabled:text-gray-400" disabled={!reelCommentDrafts[commentsSheetReel.id]?.trim()}>Post</button>
+              </form>
+            </div>
+          </div>
+        </div>
       )}
       
     </div>
