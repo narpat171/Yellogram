@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { X, MoreHorizontal, Heart, Send, Smile, Trash2 } from 'lucide-react';
+import { X, MoreHorizontal, Heart, Smile, Trash2, Eye, ChevronUp } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const DEFAULT_STORY_DURATION = 5000;
@@ -15,6 +15,9 @@ export default function StoryViewer({ groupedStories, initialUserIndex = 0, curr
   const [isDeleting, setIsDeleting] = useState(false);
   const [isStoryLiked, setIsStoryLiked] = useState(false);
   const [storyLikers, setStoryLikers] = useState([]);
+  const [storyViewsCount, setStoryViewsCount] = useState(0);
+  const [storyViewers, setStoryViewers] = useState([]);
+  const [showViewersSheet, setShowViewersSheet] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
   const progressRef = useRef(0);
   const pointerDownAtRef = useRef(0);
@@ -32,25 +35,47 @@ export default function StoryViewer({ groupedStories, initialUserIndex = 0, curr
     if (currentStory?.id) onStoryViewed?.(currentStory.id);
   }, [currentStory?.id, onStoryViewed]);
 
-  const loadStoryLikes = useCallback(async () => {
+  const loadStoryStats = useCallback(async () => {
     if (!currentStory?.id) return;
     const { data: likes, error } = await supabase.from('story_likes').select('user_id').eq('story_id', currentStory.id);
     if (error) return console.error('Could not load story likes:', error);
-    const ids = (likes || []).map((like) => like.user_id);
-    setIsStoryLiked(ids.includes(currentUserId));
+    const likedIds = (likes || []).map((like) => like.user_id);
+    setIsStoryLiked(likedIds.includes(currentUserId));
 
-    if (isOwnStory && ids.length) {
-      const { data: users } = await supabase.from('users').select('id, username, profile_pic').in('id', ids);
-      setStoryLikers(users || []);
+    if (isOwnStory) {
+      const { data: views } = await supabase.from('story_views').select('user_id, viewed_at').eq('story_id', currentStory.id).order('viewed_at', { ascending: false });
+      const viewerIds = (views || []).map((view) => view.user_id);
+      setStoryViewsCount(viewerIds.length);
+
+      const allIds = [...new Set([...viewerIds, ...likedIds])];
+      if (allIds.length) {
+        const { data: users } = await supabase.from('users').select('id, username, profile_pic').in('id', allIds);
+        const userMap = Object.fromEntries((users || []).map((user) => [user.id, user]));
+        setStoryViewers(allIds.map((id) => ({ ...(userMap[id] || { id }), liked: likedIds.includes(id) })));
+        setStoryLikers(likedIds.map((id) => userMap[id]).filter(Boolean));
+      } else {
+        setStoryViewers([]);
+        setStoryLikers([]);
+      }
     } else {
+      setStoryViewers([]);
       setStoryLikers([]);
     }
   }, [currentStory?.id, currentUserId, isOwnStory]);
 
   useEffect(() => {
-    loadStoryLikes();
+    loadStoryStats();
     setShowStickers(false);
-  }, [loadStoryLikes, storyKey]);
+    setShowViewersSheet(false);
+  }, [loadStoryStats, storyKey]);
+
+  useEffect(() => {
+    if (!currentStory?.id || currentStory.user_id === currentUserId) return;
+    supabase.from('story_views').upsert(
+      { story_id: currentStory.id, user_id: currentUserId, viewed_at: new Date().toISOString() },
+      { onConflict: 'story_id,user_id' }
+    ).then();
+  }, [currentStory?.id, currentStory?.user_id, currentUserId]);
 
   const toggleStoryLike = async () => {
     if (!currentUserId || isOwnStory) return;
@@ -283,9 +308,27 @@ export default function StoryViewer({ groupedStories, initialUserIndex = 0, curr
 
       <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/90 via-black/50 to-transparent pt-12 pb-6 px-4 z-20">
         {isOwnStory ? (
-          <div className="rounded-2xl bg-black/40 border border-white/20 px-4 py-3 text-white backdrop-blur-md">
-            <div className="flex items-center gap-2 font-bold"><Heart className="h-5 w-5 fill-red-500 text-red-500" /> {storyLikers.length} liked your story</div>
-            {storyLikers.length > 0 && <div className="mt-2 flex gap-2 overflow-x-auto">{storyLikers.map((user) => <div key={user.id} className="flex shrink-0 items-center gap-1 text-xs"><img src={user.profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`} alt="" className="h-6 w-6 rounded-full" />{user.username || 'User'}</div>)}</div>}
+          <div className="rounded-2xl bg-black/40 border border-white/20 px-4 py-3 text-white backdrop-blur-md cursor-pointer active:opacity-80 transition-opacity" onClick={() => setShowViewersSheet(true)}>
+            <div className="flex items-center gap-1.5 font-bold">
+              <Eye className="h-5 w-5" />
+              <span>{storyViewsCount}</span>
+              <span className="text-white/60 font-medium">views</span>
+              <span className="mx-1.5 text-white/30">·</span>
+              <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+              <span>{storyLikers.length}</span>
+              <span className="text-white/60 font-medium">liked your story</span>
+              <ChevronUp className="h-4 w-4 ml-auto text-white/50" />
+            </div>
+            {storyLikers.length > 0 && (
+              <div className="mt-2 flex items-center">
+                <div className="flex gap-1">
+                  {storyLikers.slice(0, 4).map((user) => (
+                    <img key={user.id} src={user.profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`} alt="" className="h-6 w-6 rounded-full border-2 border-black/50 object-cover" />
+                  ))}
+                </div>
+                <span className="ml-2 text-xs text-white/50 font-semibold">View all</span>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -300,6 +343,30 @@ export default function StoryViewer({ groupedStories, initialUserIndex = 0, curr
           </>
         )}
       </div>
+
+      {showViewersSheet && (
+        <div className="fixed inset-0 z-[350] bg-black/60 flex items-end justify-center" onClick={() => setShowViewersSheet(false)}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl pb-6 max-h-[75vh] overflow-y-auto animate-in slide-in-from-bottom-full duration-300" onClick={(event) => event.stopPropagation()}>
+            <div className="sticky top-0 bg-white pt-4 pb-3 px-5 border-b border-gray-100 flex items-center justify-between z-10">
+              <div>
+                <h3 className="font-black text-gray-900">Story viewers</h3>
+                <p className="text-sm text-gray-500 font-medium">{storyViewsCount} views</p>
+              </div>
+              <button onClick={() => setShowViewersSheet(false)} className="p-1 active:scale-90 transition-transform" aria-label="Close viewers"><X className="w-6 h-6 text-gray-500" /></button>
+            </div>
+            <div className="px-5 pt-3 flex flex-col">
+              {storyViewers.map((viewer) => (
+                <div key={viewer.id} className="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
+                  <img src={viewer.profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${viewer.id}`} alt="" className="h-11 w-11 rounded-full object-cover bg-gray-100" />
+                  <span className="flex-1 font-bold text-gray-900 truncate">{viewer.username || 'User'}</span>
+                  {viewer.liked && <Heart className="w-5 h-5 fill-red-500 text-red-500" />}
+                </div>
+              ))}
+              {storyViewers.length === 0 && <p className="py-10 text-center text-gray-400 font-bold">No views yet</p>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
