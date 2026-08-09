@@ -349,6 +349,7 @@ export default function HomeFeed() {
   };
 
   const myStoryGroup = groupedStoriesList.find(g => g.user_id === currentUser?.id);
+  const displayStoryGroups = groupedStoriesList.filter(g => g.user_id !== currentUser?.id);
 
   return (
     <div className="w-full bg-gray-50 min-h-screen pb-24 relative">
@@ -404,7 +405,7 @@ export default function HomeFeed() {
           <span className="text-[12px] font-bold text-gray-500 mt-1">Your story</span>
         </div>
 
-        {groupedStoriesList.map((group, i) => (
+        {displayStoryGroups.map((group, i) => (
           <div key={group.user_id || i} onClick={() => { setSelectedUserIndex(i); setViewerOpen(true); }} className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0 group">
             <div className={`w-[75px] h-[75px] rounded-2xl border-[3px] p-[2px] bg-white group-hover:scale-95 transition-transform ${group.items.every((story) => viewedStoryIds[story.id]) ? 'border-gray-300' : 'border-yellow-400'}`}>
               <img src={group.user?.profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${group.user?.username || i}`} alt="Story" className="w-full h-full rounded-[12px] object-cover bg-gray-100" />
