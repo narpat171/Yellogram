@@ -563,7 +563,7 @@ export default function HomeFeed() {
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleFollow(post.user_id); }}
                       className={`ml-1 px-3 py-1 rounded-lg text-[12px] font-bold transition-all active:scale-95 flex-shrink-0 ${
-                        followedUsers[post.user_id] ? 'bg-gray-100 text-gray-500' : 'bg-blue-500 text-white'
+                        followedUsers[post.user_id] ? 'bg-gray-100 text-gray-500' : 'bg-gray-900 text-yellow-400'
                       }`}
                     >
                       {followedUsers[post.user_id] ? 'Following' : 'Follow'}

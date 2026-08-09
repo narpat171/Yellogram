@@ -311,7 +311,7 @@ export default function ProfilePage() {
                       {!isMe && (
                         <button 
                           onClick={() => toggleListFollow(user.id)}
-                          className={`px-4 py-1.5 rounded-lg text-[13px] font-bold active:scale-95 transition-all ${amIFollowing ? 'bg-gray-100 text-gray-900' : 'bg-blue-500 text-white'}`}
+                          className={`px-4 py-1.5 rounded-lg text-[13px] font-bold active:scale-95 transition-all ${amIFollowing ? 'bg-gray-100 text-gray-900' : 'bg-gray-900 text-yellow-400'}`}
                         >
                           {amIFollowing ? 'Following' : 'Follow'}
                         </button>

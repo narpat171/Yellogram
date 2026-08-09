@@ -134,7 +134,7 @@ const Reel = ({ reel, onLikeToggle, currentUser, isFollowing, onFollowToggle }) 
                 className={`px-3 py-1 rounded-lg text-[12px] font-bold ml-2 transition-all active:scale-95 flex-shrink-0 ${
                   isFollowing 
                     ? 'bg-white/20 text-white border border-white/40' 
-                    : 'bg-blue-500 text-white border border-blue-500'
+                    : 'bg-gray-900 text-yellow-400 border border-gray-900'
                 }`}
               >
                 {isFollowing ? 'Following' : 'Follow'}
