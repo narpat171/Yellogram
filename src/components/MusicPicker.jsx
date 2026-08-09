@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, X, Play, Pause, Loader2, ChevronLeft } from 'lucide-react';
+import { Search, X, Play, Pause, Loader2, ChevronLeft, Check, Square, Music2, Type, Brush, Sticker } from 'lucide-react';
 
 const TRENDING = [
   'Dhanda Nyoliwala', 'Masoom Sharma', 'Amanraj Gill', 'KD Desi Rock',
@@ -92,6 +92,7 @@ export default function MusicPicker({ onSelect, onClose }) {
   const [activeArtist, setActiveArtist] = useState(null);
   const [cropSong, setCropSong] = useState(null);
   const [cropStart, setCropStart] = useState(0);
+  const [textStyle, setTextStyle] = useState('none');
   const audioRef = useRef(null);
 
   useEffect(() => {
@@ -147,7 +148,38 @@ export default function MusicPicker({ onSelect, onClose }) {
     setCropSong(song);
     setCropStart(0);
     setPlayingUrl('');
+    setTextStyle('none');
   };
+
+  const cropAreaRef = useRef(null);
+  const draggingRef = useRef(false);
+
+  const setCropFromClientX = clientX => {
+    const el = cropAreaRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    setCropStart(Math.round(ratio * 28 * 10) / 10);
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+      setPlayingUrl('');
+    }
+  };
+
+  const onCropPointerDown = e => {
+    e.preventDefault();
+    draggingRef.current = true;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setCropFromClientX(e.clientX);
+  };
+  const onCropPointerMove = e => {
+    if (!draggingRef.current) return;
+    setCropFromClientX(e.clientX);
+  };
+  const onCropPointerUp = () => { draggingRef.current = false; };
+
+  const closeCrop = () => { setCropSong(null); setPlayingUrl(''); draggingRef.current = false; };
 
   const toggleCropPlay = () => {
     if (!cropSong) return;
@@ -168,52 +200,109 @@ export default function MusicPicker({ onSelect, onClose }) {
     onSelect({ name: `${cropSong.trackName} - ${cropSong.artistName}`, url: cropSong.previewUrl, start: Math.round(cropStart * 100) / 100 });
   };
 
-  const formatTime = s => {
-    const sec = Math.max(0, Math.floor(s));
-    return `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
-  };
+  const TEXT_STYLES = [{ key: 'none', label: '🚫' }, { key: 'a', label: 'Aa' }, { key: 'ai', label: 'AI' }, { key: 'b', label: 'Aa' }];
+
+  const cropBars = cropSong ? (() => {
+    let seed = (Number(cropSong.trackId || 7) * 2654435761) % 233280 || 7;
+    return Array.from({ length: 84 }, () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return 0.3 + (seed / 233280) * 0.7;
+    });
+  })() : [];
+
+  const CROP_BG = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=900&q=80';
 
   const languageTab = LANGUAGE_TABS.find(t => t.id === tab);
 
   return (
     <div className="absolute inset-0 bg-[#121212]/95 z-[100] flex flex-col animate-in fade-in duration-200">
       {cropSong ? (
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
-            <button onClick={() => { setCropSong(null); setPlayingUrl(''); }} className="text-white hover:text-gray-300 active:scale-90 transition-transform"><X className="w-7 h-7" /></button>
-            <p className="text-white font-bold text-sm flex-1">Crop song</p>
-            <button onClick={handleCropDone} className="text-gray-900 font-black text-sm bg-yellow-400 hover:bg-yellow-500 active:scale-95 px-5 py-2 rounded-full transition-all">
-              Done
-            </button>
-          </div>
+        <div className="relative flex-1 flex flex-col overflow-hidden">
+          <img src={CROP_BG} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black/45" />
 
-          <div className="flex-1 flex flex-col items-center justify-center px-6">
-            {cropSong.artworkUrl100 && (
-              <img src={cropSong.artworkUrl100} alt="" className="w-40 h-40 rounded-2xl object-cover shadow-2xl" />
-            )}
-            <p className="text-white font-bold mt-5 text-center">{cropSong.trackName}</p>
-            <p className="text-white/50 text-sm text-center mb-8">{cropSong.artistName}</p>
-
-            <button onClick={toggleCropPlay} className="w-16 h-16 rounded-full bg-yellow-400 text-gray-900 flex items-center justify-center active:scale-90 transition-all shadow-lg">
-              {playingUrl ? <Pause className="w-7 h-7" fill="currentColor" /> : <Play className="w-7 h-7 ml-1" fill="currentColor" />}
-            </button>
-            <p className="text-white/60 text-xs mt-3 font-bold">{playingUrl ? 'Preview from crop point' : 'Tap to preview from crop point'}</p>
-
-            <div className="w-full mt-8">
-              <div className="flex justify-between text-white/60 text-xs font-bold mb-2">
-                <span>{formatTime(cropStart)}</span>
-                <span>30</span>
+          <div className="relative z-10 flex flex-col h-full">
+            <div className="flex items-center justify-between px-4 pt-4">
+              <button onClick={closeCrop} className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Cancel">
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-2">
+                <button className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Text style"><Type className="w-5 h-5" /></button>
+                <button className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Brush"><Brush className="w-5 h-5" /></button>
+                <button className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Stickers"><Sticker className="w-5 h-5" /></button>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="28"
-                step="0.5"
-                value={cropStart}
-                onChange={e => { setCropStart(Number(e.target.value)); if (audioRef.current && !audioRef.current.paused) { audioRef.current.pause(); setPlayingUrl(''); } }}
-                className="w-full accent-yellow-400"
-              />
-              <p className="text-white/40 text-xs mt-2 text-center">Song ise point se start hoga</p>
+              <button onClick={handleCropDone} className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-lg active:scale-90 transition-transform" aria-label="Done">
+                <Check className="w-5 h-5" strokeWidth={3} />
+              </button>
+            </div>
+
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-white/15 backdrop-blur-md border border-white/30 flex items-center justify-center">
+                <Music2 className="w-8 h-8 text-white" />
+              </div>
+              <p className="text-white text-3xl font-bold tracking-wide">Music Only</p>
+            </div>
+
+            <div className="px-4 pb-7 space-y-5">
+              <div className="flex items-center justify-center gap-6">
+                {TEXT_STYLES.map(ts => (
+                  <button
+                    key={ts.key}
+                    onClick={() => setTextStyle(ts.key)}
+                    className={ts.key === textStyle
+                      ? 'w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-900 font-black text-base shadow-lg active:scale-90 transition-all'
+                      : 'w-10 h-10 flex items-center justify-center text-white/70 font-bold text-base active:scale-90 transition-all'}
+                  >
+                    {ts.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/25 flex items-center justify-center text-white font-black text-base">
+                  {Math.floor(cropStart)}
+                </div>
+                <div className="flex-1 relative h-10 flex items-center">
+                  <div className="absolute left-0 right-0 top-1/2 h-px bg-white/30" />
+                  <div className="absolute left-0 top-1/2 h-[2.5px] -translate-y-1/2 bg-white rounded-full" style={{ width: `${(cropStart / 30) * 100}%` }} />
+                  {[0.25, 0.5, 0.75].map(m => (
+                    <span key={m} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full bg-pink-400" style={{ left: `${m * 100}%` }} />
+                  ))}
+                  <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-white shadow-md ring-2 ring-pink-400/70" style={{ left: `${(cropStart / 30) * 100}%` }} />
+                </div>
+                <button onClick={toggleCropPlay} className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-lg active:scale-90 transition-transform" aria-label="Play preview">
+                  {playingUrl ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-5 h-5 ml-0.5 fill-current" />}
+                </button>
+              </div>
+
+              <div
+                ref={cropAreaRef}
+                onPointerDown={onCropPointerDown}
+                onPointerMove={onCropPointerMove}
+                onPointerUp={onCropPointerUp}
+                onPointerLeave={onCropPointerUp}
+                onPointerCancel={onCropPointerUp}
+                className="relative h-24 select-none touch-none cursor-ew-resize"
+              >
+                <div
+                  className="absolute inset-y-1 rounded-full bg-gradient-to-r from-yellow-400/70 via-orange-400/70 to-pink-500/70 border-2 border-white/60 shadow-xl pointer-events-none"
+                  style={{ left: `${(cropStart / 30) * 100}%`, width: `${((30 - cropStart) / 30) * 100}%` }}
+                />
+                <div className="absolute inset-0 flex items-end gap-[3px] px-1 pb-1.5">
+                  {cropBars.map((h, i) => {
+                    const t = (i / cropBars.length) * 30;
+                    const inClip = t >= cropStart;
+                    const isHighlight = inClip && (i + Math.floor(Number(cropSong.trackId || 0))) % 7 === 0;
+                    return (
+                      <div
+                        key={i}
+                        className="flex-1 rounded-full transition-colors"
+                        style={{ height: `${h * 100}%`, background: isHighlight ? '#fb7185' : inClip ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.28)' }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
