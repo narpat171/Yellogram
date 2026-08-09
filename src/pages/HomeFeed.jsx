@@ -325,7 +325,11 @@ export default function HomeFeed() {
     const { postId, comment } = pendingDeleteComment;
     setPendingDeleteComment(null);
     const { error } = await supabase.from('post_comments').delete().eq('id', comment.id);
-    if (error) return alert(error.message);
+    if (error) {
+      console.error('Delete comment failed:', error);
+      alert('Delete failed: DB delete policy missing. Supabase SQL Editor me ye run karo:\n\ncreate policy "post_comments_delete_own" on public.post_comments for delete using (user_id = auth.uid());');
+      return;
+    }
     setCommentsByPost((value) => ({ ...value, [postId]: (value[postId] || []).filter((c) => c.id !== comment.id) }));
     setPosts((value) => value.map((item) => item.id === postId ? { ...item, comments: Math.max(0, (Number(item.comments) || 0) - 1) } : item));
   };

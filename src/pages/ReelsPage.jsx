@@ -312,7 +312,11 @@ export default function ReelsPage() {
     const { reelId, comment } = pendingDeleteComment;
     setPendingDeleteComment(null);
     const { error } = await supabase.from('post_comments').delete().eq('id', comment.id);
-    if (error) return alert(error.message);
+    if (error) {
+      console.error('Delete comment failed:', error);
+      alert('Delete failed: DB delete policy missing. Supabase SQL Editor me ye run karo:\n\ncreate policy "post_comments_delete_own" on public.post_comments for delete using (user_id = auth.uid());');
+      return;
+    }
     setReelComments((value) => ({ ...value, [reelId]: (value[reelId] || []).filter((c) => c.id !== comment.id) }));
     setReels((value) => value.map((item) => item.id === reelId ? { ...item, comments: Math.max(0, (Number(item.comments) || 0) - 1) } : item));
   };
