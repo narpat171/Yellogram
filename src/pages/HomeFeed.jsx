@@ -397,7 +397,7 @@ export default function HomeFeed() {
             fileInputRef.current?.click();
           }
         }}>
-          <div className={`w-[75px] h-[75px] rounded-2xl border-[3px] p-[2px] bg-white group-hover:scale-95 transition-transform ${myStoryGroup ? (myStoryGroup.items.every((story) => viewedStoryIds[story.id]) ? 'border-gray-300' : 'border-yellow-400') : 'border-gray-200'}`}>
+            <div className={`w-[75px] h-[75px] rounded-2xl border-[3px] p-[2px] bg-white group-hover:scale-95 transition-transform ${myStoryGroup ? (myStoryGroup.items.every((story) => viewedStoryIds[story.id]) ? 'border-gray-300' : 'border-yellow-400') : 'border-transparent'}`}>
             <div className="relative w-full h-full">
               <img src={myProfilePic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id || 'currentUser'}`} alt="Your Story" className="w-full h-full rounded-[12px] object-cover bg-gray-100" />
               {uploadingStory && (
