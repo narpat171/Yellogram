@@ -396,11 +396,9 @@ export default function HomeFeed() {
                 <div className="absolute -inset-[6px] rounded-2xl pointer-events-none animate-spin"
                   style={{ background: 'conic-gradient(from 270deg, transparent 0deg, rgba(250,204,21,1) 80deg, transparent 160deg)', animationDuration: '1.2s' }} />
               )}
-              {!myStoryGroup && (
-                <div className="absolute -bottom-1 -right-1 bg-yellow-400 rounded-lg p-1 border-2 border-white shadow-sm">
-                  {uploadingStory ? <Loader2 className="w-4 h-4 text-gray-900 animate-spin" /> : <Plus className="w-4 h-4 text-gray-900 font-bold" strokeWidth={3} />}
-                </div>
-              )}
+              <button onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} className="absolute -bottom-1 -right-1 bg-yellow-400 rounded-lg p-1 border-2 border-white shadow-sm active:scale-90 transition-transform" aria-label="Add story">
+                {uploadingStory ? <Loader2 className="w-4 h-4 text-gray-900 animate-spin" /> : <Plus className="w-4 h-4 text-gray-900 font-bold" strokeWidth={3} />}
+              </button>
             </div>
           </div>
           <input type="file" ref={fileInputRef} accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
