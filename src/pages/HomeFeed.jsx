@@ -93,6 +93,7 @@ export default function HomeFeed() {
   const [showMusicPicker, setShowMusicPicker] = useState(false);
 
   const fileInputRef = useRef(null);
+  const deleteCommentTimerRef = useRef(null);
   
   const handleStoryViewed = useCallback((storyId) => {
     setViewedStoryIds((value) => {
@@ -316,6 +317,19 @@ export default function HomeFeed() {
   const openCommentSheet = (post) => {
     setCommentsSheetPost(post);
     loadComments(post.id);
+  };
+
+  const deleteComment = async (postId, comment) => {
+    if (!window.confirm('Delete this comment?')) return;
+    const { error } = await supabase.from('post_comments').delete().eq('id', comment.id);
+    if (error) return alert(error.message);
+    setCommentsByPost((value) => ({ ...value, [postId]: (value[postId] || []).filter((c) => c.id !== comment.id) }));
+    setPosts((value) => value.map((item) => item.id === postId ? { ...item, comments: Math.max(0, (Number(item.comments) || 0) - 1) } : item));
+  };
+
+  const startDeleteCommentPress = (comment) => {
+    if (comment.user_id !== currentUser?.id) return;
+    deleteCommentTimerRef.current = setTimeout(() => deleteComment(commentsSheetPost.id, comment), 500);
   };
 
   const submitComment = async (event, post) => {
@@ -630,7 +644,12 @@ export default function HomeFeed() {
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-3">
               {(commentsByPost[commentsSheetPost.id] || []).map((comment) => (
-                <div key={comment.id} className="flex items-start gap-3 py-2.5">
+                <div key={comment.id} className="flex items-start gap-3 py-2.5 active:bg-gray-50 transition-colors"
+                  onPointerDown={() => startDeleteCommentPress(comment)}
+                  onPointerUp={() => clearTimeout(deleteCommentTimerRef.current)}
+                  onPointerCancel={() => clearTimeout(deleteCommentTimerRef.current)}
+                  onPointerLeave={() => clearTimeout(deleteCommentTimerRef.current)}
+                >
                   <img src={comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`} alt="" className="h-9 w-9 rounded-full object-cover bg-gray-100" />
                   <div className="flex-1 min-w-0">
                     <span className="font-bold text-sm mr-1">{comment.username || 'User'}</span>

@@ -302,6 +302,21 @@ export default function ReelsPage() {
     loadReelComments(reel.id);
   };
 
+  const deleteCommentTimerRef = useRef(null);
+
+  const deleteReelComment = async (reelId, comment) => {
+    if (!window.confirm('Delete this comment?')) return;
+    const { error } = await supabase.from('post_comments').delete().eq('id', comment.id);
+    if (error) return alert(error.message);
+    setReelComments((value) => ({ ...value, [reelId]: (value[reelId] || []).filter((c) => c.id !== comment.id) }));
+    setReels((value) => value.map((item) => item.id === reelId ? { ...item, comments: Math.max(0, (Number(item.comments) || 0) - 1) } : item));
+  };
+
+  const startDeleteReelCommentPress = (comment) => {
+    if (comment.user_id !== currentUser?.id) return;
+    deleteCommentTimerRef.current = setTimeout(() => deleteReelComment(commentsSheetReel.id, comment), 500);
+  };
+
   const submitReelComment = async (event, reel) => {
     event.preventDefault();
     const content = (reelCommentDrafts[reel.id] || '').trim();
@@ -367,7 +382,12 @@ export default function ReelsPage() {
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-3">
               {(reelComments[commentsSheetReel.id] || []).map((comment) => (
-                <div key={comment.id} className="flex items-start gap-3 py-2.5">
+                <div key={comment.id} className="flex items-start gap-3 py-2.5 active:bg-gray-50 transition-colors"
+                  onPointerDown={() => startDeleteReelCommentPress(comment)}
+                  onPointerUp={() => clearTimeout(deleteCommentTimerRef.current)}
+                  onPointerCancel={() => clearTimeout(deleteCommentTimerRef.current)}
+                  onPointerLeave={() => clearTimeout(deleteCommentTimerRef.current)}
+                >
                   <img src={comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`} alt="" className="h-9 w-9 rounded-full object-cover bg-gray-100" />
                   <div className="flex-1 min-w-0">
                     <span className="font-bold text-sm mr-1">{comment.username || 'User'}</span>
