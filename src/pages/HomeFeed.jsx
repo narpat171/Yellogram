@@ -380,7 +380,8 @@ export default function HomeFeed() {
       </div>
 
       <div className="bg-white pt-4 pb-3 px-3 border-b border-gray-200 flex gap-4 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0 group" onClick={() => {
+        <div className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0 group" onClick={(e) => {
+          if (e.target.closest('button')) return;
           if (myStoryGroup) {
             const idx = groupedStoriesList.findIndex(g => g.user_id === currentUser?.id);
             setSelectedUserIndex(idx);
@@ -396,14 +397,14 @@ export default function HomeFeed() {
                 <div className="absolute -inset-[6px] rounded-2xl pointer-events-none animate-spin"
                   style={{ background: 'conic-gradient(from 270deg, transparent 0deg, rgba(250,204,21,1) 80deg, transparent 160deg)', animationDuration: '1.2s' }} />
               )}
-              <button onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} className="absolute -bottom-1 -right-1 bg-yellow-400 rounded-lg p-1 border-2 border-white shadow-sm active:scale-90 transition-transform" aria-label="Add story">
+              <button onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} className="absolute -bottom-2 -right-1 bg-yellow-400 rounded-lg p-1.5 border-2 border-white shadow-sm active:scale-90 transition-transform" aria-label="Add story">
                 {uploadingStory ? <Loader2 className="w-4 h-4 text-gray-900 animate-spin" /> : <Plus className="w-4 h-4 text-gray-900 font-bold" strokeWidth={3} />}
               </button>
             </div>
           </div>
           <span className="text-[12px] font-bold text-gray-500 mt-1">Your story</span>
         </div>
-        <input type="file" ref={fileInputRef} accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+        <input type="file" ref={fileInputRef} accept="image/*,video/*" onChange={handleFileSelect} onClick={(e) => e.stopPropagation()} className="hidden" />
 
         {displayStoryGroups.map((group, i) => (
           <div key={group.user_id || i} onClick={() => { setSelectedUserIndex(i); setViewerOpen(true); }} className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0 group">
