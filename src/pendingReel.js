@@ -1,11 +1,11 @@
-let pendingId = null;
+let pendingItem = null;
 
-export const setPendingReelId = (id) => {
-  pendingId = id;
+export const setPendingReelItem = (item) => {
+  pendingItem = item;
 };
 
-export const takePendingReelId = () => {
-  const id = pendingId;
-  pendingId = null;
-  return id;
+export const getPendingReelItem = () => pendingItem;
+
+export const clearPendingReelItem = () => {
+  pendingItem = null;
 };

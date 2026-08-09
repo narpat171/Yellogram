@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Send, Bookmark, Bell, MoreHorizontal, Loader2, Upload, X, Type, Smile, Wand2, Music, AtSign, Users, Trash2, ZoomIn, ZoomOut, Download, ChevronRight } from 'lucide-react';
 import { supabase } from '../supabase'; 
-import { setPendingReelId } from '../pendingReel';
+import { setPendingReelItem } from '../pendingReel';
 import StoryViewer from "../components/StoryViewer";
 import Skeleton from "../components/Skeleton";
 import MusicPicker from "../components/MusicPicker";
@@ -110,7 +110,7 @@ const FeedReelCard = ({ reel, currentUser, isLiked, isFollowing, onLikeToggle, o
         </button>
       </header>
 
-      <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center cursor-pointer" onClick={() => onOpenPlayer(reel.id)}>
+      <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center cursor-pointer" onClick={() => onOpenPlayer(reel)}>
         <video ref={videoRef} src={reel.media_url} loop muted playsInline preload="metadata" className="w-full h-full object-cover" />
       </div>
 
@@ -550,8 +550,8 @@ export default function HomeFeed() {
     if(window.confirm("Discard your story edits?")) { setEditorOpen(false); setEditingFile(null); setMediaPreviewUrl(''); }
   };
 
-  const openReelsPlayer = (id) => {
-    setPendingReelId(id);
+  const openReelsPlayer = (post) => {
+    setPendingReelItem(post);
     navigate('/reels');
   };
 
@@ -789,7 +789,7 @@ export default function HomeFeed() {
                 </button>
               </header>
 
-              <div className="cursor-pointer" onClick={() => openReelsPlayer(post.id)}>
+              <div className="cursor-pointer" onClick={() => openReelsPlayer(post)}>
                 <FeedImage src={post.media_url} alt={post.caption || 'Post'} className="w-full aspect-square" />
               </div>
 

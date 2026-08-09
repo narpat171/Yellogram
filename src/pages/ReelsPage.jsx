@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Music, Volume2, VolumeX, Camera, X, Loader2 } from 'lucide-react';
 import { supabase } from '../supabase'; 
 import Skeleton from '../components/Skeleton';
-import { takePendingReelId } from '../pendingReel';
+import { getPendingReelItem, clearPendingReelItem } from '../pendingReel';
 
 const dummyReels = [
   {
@@ -342,15 +342,10 @@ export default function ReelsPage() {
 
   useEffect(() => {
     if (location.pathname !== '/reels') return;
-    const id = takePendingReelId();
-    if (!id) return;
-    (async () => {
-      const { data } = await supabase.from('posts').select('*').eq('id', id).maybeSingle();
-      if (data) {
-        setStartItem(data);
-        if (containerRef.current) containerRef.current.scrollTo(0, 0);
-      }
-    })();
+    const hadPending = getPendingReelItem() != null;
+    clearPendingReelItem();
+    if (!hadPending) setStartItem(null);
+    if (hadPending && containerRef.current) containerRef.current.scrollTo(0, 0);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -472,6 +467,13 @@ export default function ReelsPage() {
       supabase.from('notifications').insert({ user_id: reel.user_id, sender_id: currentUser.id, post_id: reel.id, type: 'message', content: `commented: "${content}"` }).then();
     }
   };
+
+  if (location.pathname === '/reels') {
+    const pendingItem = getPendingReelItem();
+    if (pendingItem && (!startItem || startItem.id !== pendingItem.id)) {
+      setStartItem(pendingItem);
+    }
+  }
 
   const ensurePostSlots = (count) => {
     const slots = postSlotsRef.current;
