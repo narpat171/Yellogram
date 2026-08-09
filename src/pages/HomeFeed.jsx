@@ -324,10 +324,10 @@ export default function HomeFeed() {
     if (!pendingDeleteComment) return;
     const { postId, comment } = pendingDeleteComment;
     setPendingDeleteComment(null);
-    const { error } = await supabase.from('post_comments').delete().eq('id', comment.id);
-    if (error) {
+    const { data: deletedRows, error } = await supabase.from('post_comments').delete().eq('id', comment.id).select('id');
+    if (error || !deletedRows || deletedRows.length === 0) {
       console.error('Delete comment failed:', error);
-      alert('Delete failed: ' + error.message);
+      alert('Delete failed: ' + (error?.message || 'comment DB me delete nahi hua (RLS blocked, 0 rows)'));
       return;
     }
     setCommentsByPost((value) => ({ ...value, [postId]: (value[postId] || []).filter((c) => c.id !== comment.id) }));
