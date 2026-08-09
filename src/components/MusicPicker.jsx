@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Search, X, Play, Pause, Loader2, ChevronLeft, Check, Square } from 'lucide-react';
+import { Search, X, Play, Pause, Loader2, ChevronLeft, Check, Square, Upload } from 'lucide-react';
+import { supabase } from '../supabase';
 
 const TRENDING = [
   'Dhanda Nyoliwala', 'Masoom Sharma', 'Amanraj Gill', 'KD Desi Rock',
@@ -92,7 +93,9 @@ export default function MusicPicker({ onSelect, onClose }) {
   const [activeArtist, setActiveArtist] = useState(null);
   const [cropSong, setCropSong] = useState(null);
   const [cropStart, setCropStart] = useState(0);
+  const [uploading, setUploading] = useState(false);
   const audioRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     return () => { if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; } };
@@ -149,6 +152,34 @@ export default function MusicPicker({ onSelect, onClose }) {
     setPlayingUrl('');
   };
 
+  const handleUploadFile = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const isAudio = file.type.startsWith('audio/') || /\.(mp3|m4a|wav|ogg|aac)$/i.test(file.name);
+    if (!isAudio) { setError('Sirf audio file upload kar sakte ho'); return; }
+    setUploading(true);
+    setError('');
+    const objectUrl = URL.createObjectURL(file);
+    const probe = new Audio(objectUrl);
+    probe.preload = 'metadata';
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      const dur = probe.duration && isFinite(probe.duration) ? Math.max(3, Math.round(probe.duration)) : 30;
+      probe.removeAttribute('src');
+      setCropSong({ trackName: file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '), artistName: 'Uploaded song', previewUrl: objectUrl, artworkUrl100: null, trackId: 'upload', isUpload: true, file, duration: dur });
+      setCropStart(0);
+      setPlayingUrl('');
+      setUploading(false);
+    };
+    probe.addEventListener('loadedmetadata', finish);
+    probe.addEventListener('error', finish);
+    setTimeout(finish, 4000);
+  };
+
+  const cropTotal = cropSong?.duration || 30;
+
   const cropAreaRef = useRef(null);
   const timelineRef = useRef(null);
   const draggingRef = useRef(false);
@@ -157,7 +188,7 @@ export default function MusicPicker({ onSelect, onClose }) {
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    setCropStart(Math.round(ratio * 28 * 10) / 10);
+    setCropStart(Math.round(ratio * Math.max(2, cropTotal - 2) * 10) / 10);
     if (audioRef.current && !audioRef.current.paused) {
       audioRef.current.pause();
       audioRef.current.src = '';
@@ -194,8 +225,26 @@ export default function MusicPicker({ onSelect, onClose }) {
     audio.onended = () => setPlayingUrl('');
   };
 
-  const handleCropDone = () => {
-    onSelect({ name: `${cropSong.trackName} - ${cropSong.artistName}`, url: cropSong.previewUrl, start: Math.round(cropStart * 100) / 100 });
+  const handleCropDone = async () => {
+    if (!cropSong || uploading) return;
+    const start = Math.round(cropStart * 100) / 100;
+    if (cropSong.isUpload) {
+      setUploading(true);
+      try {
+        const ext = (cropSong.file.name.split('.').pop() || 'mp3').toLowerCase();
+        const path = `story_songs/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('yellowgram_uploads').upload(path, cropSong.file, { contentType: cropSong.file.type });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from('yellowgram_uploads').getPublicUrl(path);
+        onSelect({ name: cropSong.trackName, url: pub.publicUrl, start, duration: cropSong.duration || 30 });
+      } catch (err) {
+        setError('Upload fail hua. Dobara try karo.');
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+    onSelect({ name: `${cropSong.trackName} - ${cropSong.artistName}`, url: cropSong.previewUrl, start, duration: cropSong.duration || 30 });
   };
 
   const cropBars = cropSong ? (() => {
@@ -222,8 +271,8 @@ export default function MusicPicker({ onSelect, onClose }) {
               <button onClick={closeCrop} className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition-transform" aria-label="Cancel">
                 <X className="w-5 h-5" />
               </button>
-              <button onClick={handleCropDone} className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-lg active:scale-90 transition-transform" aria-label="Done">
-                <Check className="w-5 h-5" strokeWidth={3} />
+              <button onClick={handleCropDone} disabled={uploading} className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-lg active:scale-90 transition-transform disabled:opacity-60" aria-label="Done">
+                {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" strokeWidth={3} />}
               </button>
             </div>
 
@@ -232,7 +281,7 @@ export default function MusicPicker({ onSelect, onClose }) {
             <div className="px-4 pb-7 space-y-5">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-md border border-white/25 flex items-center justify-center text-white font-black text-lg">
-                  {Math.max(0, Math.round(30 - cropStart))}
+                  {Math.max(0, Math.round(cropTotal - cropStart))}
                 </div>
                 <div
                   ref={timelineRef}
@@ -243,11 +292,11 @@ export default function MusicPicker({ onSelect, onClose }) {
                   className="flex-1 relative h-10 flex items-center select-none touch-none cursor-ew-resize"
                 >
                   <div className="absolute left-0 right-0 top-1/2 h-px bg-white/30" />
-                  <div className="absolute left-0 top-1/2 h-[2.5px] -translate-y-1/2 bg-yellow-400 rounded-full" style={{ width: `${(cropStart / 30) * 100}%` }} />
+                  <div className="absolute left-0 top-1/2 h-[2.5px] -translate-y-1/2 bg-yellow-400 rounded-full" style={{ width: `${(cropStart / cropTotal) * 100}%` }} />
                   {[0.25, 0.5, 0.75].map(m => (
                     <span key={m} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[5px] h-[5px] rounded-full bg-pink-400" style={{ left: `${m * 100}%` }} />
                   ))}
-                  <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-yellow-400 shadow-md ring-2 ring-white/80" style={{ left: `${(cropStart / 30) * 100}%` }} />
+                  <div className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-[18px] rounded-full bg-yellow-400 shadow-md ring-2 ring-white/80" style={{ left: `${(cropStart / cropTotal) * 100}%` }} />
                 </div>
                 <button onClick={toggleCropPlay} className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-gray-900 shadow-lg active:scale-90 transition-transform" aria-label="Play preview">
                   {playingUrl ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-5 h-5 ml-0.5 fill-current" />}
@@ -265,11 +314,11 @@ export default function MusicPicker({ onSelect, onClose }) {
               >
                 <div
                   className="absolute inset-y-1 bg-yellow-400/70 border-2 border-white/60 shadow-xl pointer-events-none"
-                  style={{ left: `${(cropStart / 30) * 100}%`, width: `${((30 - cropStart) / 30) * 100}%` }}
+                  style={{ left: `${(cropStart / cropTotal) * 100}%`, width: `${((cropTotal - cropStart) / cropTotal) * 100}%` }}
                 />
                 <div className="absolute inset-0 flex items-end gap-[3px] px-1 pb-1.5">
                   {cropBars.map((h, i) => {
-                    const t = (i / cropBars.length) * 30;
+                    const t = (i / cropBars.length) * cropTotal;
                     const inClip = t >= cropStart;
                     const isHighlight = inClip && (i + Math.floor(Number(cropSong.trackId || 0))) % 7 === 0;
                     return (
@@ -305,6 +354,10 @@ export default function MusicPicker({ onSelect, onClose }) {
             {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
           </button>
         </div>
+        <button onClick={() => fileInputRef.current?.click()} className="w-10 h-10 rounded-full bg-yellow-400 text-gray-900 flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform" aria-label="Upload full song" title="Upload full song">
+          {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+        </button>
+        <input ref={fileInputRef} type="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.aac" className="hidden" onChange={handleUploadFile} />
       </div>
 
       {!activeArtist && (

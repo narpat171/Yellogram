@@ -208,11 +208,11 @@ export default function StoryViewer({ groupedStories, initialUserIndex = 0, curr
     const audio = new Audio(currentStory.music_url);
     audio.loop = true;
     audio.volume = 0.85;
-    audio.currentTime = Math.min(Number(currentStory.music_start) || 0, 28);
+    audio.currentTime = Math.min(Number(currentStory.music_start) || 0, Number(currentStory.duration_ms || 30000) / 1000);
     audioRef.current = audio;
     audio.play().then(() => {}).catch(() => {});
     return () => { audio.pause(); audio.src = ''; };
-  }, [storyKey, currentStory?.music_url, currentStory?.music_start]);
+  }, [storyKey, currentStory?.music_url, currentStory?.music_start, currentStory?.duration_ms]);
 
   useEffect(() => {
     if (!currentStory || !isMediaReady || isPaused) return undefined;
