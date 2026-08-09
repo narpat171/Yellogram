@@ -251,6 +251,21 @@ export default function HomeFeed() {
     }
   };
 
+  // 🔥 SHARE POST: copy link + count badhao 🔥
+  const handleShare = async (post) => {
+    if (!currentUser) return alert('Please log in to share posts.');
+    if (navigator.clipboard) {
+      try { await navigator.clipboard.writeText(post.media_url); } catch (err) { console.error(err); }
+    }
+    const nextShares = (Number(post.shares) || 0) + 1;
+    setPosts((value) => value.map((item) => item.id === post.id ? { ...item, shares: nextShares } : item));
+    try {
+      await supabase.from('posts').update({ shares: nextShares }).eq('id', post.id);
+    } catch (err) {
+      console.error('Could not increment share count:', err);
+    }
+  };
+
   // 🔥 TOGGLE FOLLOW FUNCTION 🔥
   const toggleFollow = async (targetUserId) => {
     if (!currentUser) return alert('Please log in to follow users.');
@@ -565,11 +580,18 @@ export default function HomeFeed() {
 
               <div className="px-4 pt-3 pb-4">
                 <div className="flex items-center gap-4 mb-3">
-                  <button type="button" onClick={() => toggleLike(post)} className={likedPosts[post.id] ? 'text-red-500' : 'text-gray-900'} aria-label="Like post">
+                  <button type="button" onClick={() => toggleLike(post)} className={`flex items-center gap-1.5 ${likedPosts[post.id] ? 'text-red-500' : 'text-gray-900'}`} aria-label="Like post">
                     <Heart className="h-6 w-6" fill={likedPosts[post.id] ? 'currentColor' : 'none'} />
+                    <span className="text-sm font-bold">{Number(post.likes) || 0}</span>
                   </button>
-                  <button type="button" onClick={() => toggleComments(post.id)} className="text-gray-900" aria-label="Comment on post"><MessageCircle className="h-6 w-6" /></button>
-                  <button type="button" className="text-gray-900" aria-label="Share post"><Send className="h-6 w-6" /></button>
+                  <button type="button" onClick={() => toggleComments(post.id)} className="flex items-center gap-1.5 text-gray-900" aria-label="Comment on post">
+                    <MessageCircle className="h-6 w-6" />
+                    <span className="text-sm font-bold">{Number(post.comments) || 0}</span>
+                  </button>
+                  <button type="button" onClick={() => handleShare(post)} className="flex items-center gap-1.5 text-gray-900" aria-label="Share post">
+                    <Send className="h-6 w-6" />
+                    <span className="text-sm font-bold">{Number(post.shares) || 0}</span>
+                  </button>
                   
                   {/* 🔥 NEW BOOKMARK BUTTON 🔥 */}
                   <button type="button" onClick={() => toggleSave(post)} className="ml-auto text-gray-900 active:scale-90 transition-transform" aria-label="Save post">
@@ -577,7 +599,6 @@ export default function HomeFeed() {
                   </button>
                 </div>
 
-                {Number(post.likes) > 0 && <p className="text-sm font-bold mb-1">{post.likes} likes</p>}
                 {post.caption && (
                   <p className="text-sm break-words">
                     <span 
