@@ -46,7 +46,7 @@ const DraggableItem = ({ item, updateItem, removeItem }) => {
 };
 
 const POSTS_PER_PAGE = 20;
-const REELS_IN_FEED_INTERVAL = 5;
+const REELS_DENSITY = 0.2;
 const REELS_IN_FEED_PAGE = 10;
 
 const FeedImage = ({ src, alt, className }) => {
@@ -148,6 +148,7 @@ export default function HomeFeed() {
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const feedOffsetRef = useRef(0);
   const reelsOffsetRef = useRef(0);
+  const reelSlotsRef = useRef([]);
   const feedSentinelRef = useRef(null);
   const [feedError, setFeedError] = useState('');
   const [followedUsers, setFollowedUsers] = useState({});
@@ -336,6 +337,7 @@ export default function HomeFeed() {
 
       const newPosts = loadedPosts.map((post) => ({ ...post, users: userMap[post.user_id], commentsList: [] }));
       setPosts((prev) => (loadMore ? [...prev, ...newPosts] : newPosts));
+      if (!loadMore) reelSlotsRef.current = [];
 
       if (viewer && loadedPosts.length > 0) {
         const postIds = loadedPosts.map((post) => post.id);
@@ -347,7 +349,7 @@ export default function HomeFeed() {
         setSavedPosts((prev) => ({ ...prev, ...Object.fromEntries((mySaves || []).map((save) => [save.post_id, true])) }));
       }
 
-      const reelsNeeded = Math.ceil(feedOffsetRef.current / REELS_IN_FEED_INTERVAL) + 2;
+      const reelsNeeded = Math.ceil(feedOffsetRef.current * REELS_DENSITY) + 2;
       if (reels.length < reelsNeeded) await fetchReels();
     } catch (error) {
       console.error('Could not load posts:', error);
@@ -550,10 +552,18 @@ export default function HomeFeed() {
   const myStoryGroup = groupedStoriesList.find(g => g.user_id === currentUser?.id);
   const displayStoryGroups = groupedStoriesList.filter(g => g.user_id !== currentUser?.id);
 
+  const ensureReelSlots = (count) => {
+    const slots = reelSlotsRef.current;
+    while (slots.length < count) {
+      slots.push(slots.length > 0 && Math.random() < REELS_DENSITY);
+    }
+  };
+
+  ensureReelSlots(posts.length);
   const feedItems = [];
   let reelIndex = 0;
   posts.forEach((post, index) => {
-    if (index > 0 && index % REELS_IN_FEED_INTERVAL === 0 && reelIndex < reels.length) {
+    if (index > 0 && reelSlotsRef.current[index] && reelIndex < reels.length) {
       feedItems.push({ kind: 'reel', reel: reels[reelIndex++] });
     }
     feedItems.push({ kind: 'post', post });
