@@ -390,16 +390,14 @@ export default function HomeFeed() {
           }
         }}>
           <div className={`w-[75px] h-[75px] rounded-2xl border-[3px] p-[2px] bg-white group-hover:scale-95 transition-transform ${myStoryGroup ? (myStoryGroup.items.every((story) => viewedStoryIds[story.id]) ? 'border-gray-300' : 'border-yellow-400') : 'border-gray-200'}`}>
-            {myStoryGroup ? (
-              <img src={myStoryGroup.items[0].media_url} alt="Your Story" className="w-full h-full rounded-[12px] object-cover bg-gray-100" />
-            ) : (
-              <div className="relative w-full h-full">
-                <img src={myProfilePic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id || 'currentUser'}`} alt="Your Story" className="w-full h-full rounded-[12px] object-cover bg-gray-100" />
+            <div className="relative w-full h-full">
+              <img src={myProfilePic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id || 'currentUser'}`} alt="Your Story" className="w-full h-full rounded-[12px] object-cover bg-gray-100" />
+              {!myStoryGroup && (
                 <div className="absolute -bottom-1 -right-1 bg-yellow-400 rounded-lg p-1 border-2 border-white shadow-sm">
                   {uploadingStory ? <Loader2 className="w-4 h-4 text-gray-900 animate-spin" /> : <Plus className="w-4 h-4 text-gray-900 font-bold" strokeWidth={3} />}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
           <input type="file" ref={fileInputRef} accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
           <span className="text-[12px] font-bold text-gray-500 mt-1">Your story</span>
