@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Music, Volume2, VolumeX, Camera, X, Loader2 } from 'lucide-react';
 import { supabase } from '../supabase'; 
 import Skeleton from '../components/Skeleton';
+import { takePendingReelId } from '../pendingReel';
 
 const dummyReels = [
   {
@@ -26,6 +27,8 @@ const formatCount = (count) => {
 };
 
 const REELS_PER_PAGE = 10;
+const POSTS_IN_REELS_PAGE = 20;
+const POSTS_IN_REELS_DENSITY = 0.1;
 
 // 🔥 सिंगल रील कॉम्पोनेंट 🔥
 const Reel = ({ reel, onLikeToggle, currentUser, isFollowing, onFollowToggle, onOpenComments }) => {
@@ -190,15 +193,80 @@ const Reel = ({ reel, onLikeToggle, currentUser, isFollowing, onFollowToggle, on
 };
 
 // 🔥 Main Reels Page Component 🔥
+const ReelsImage = ({ post, currentUser, onOpenComments, onFollowToggle, isFollowing, onLikeSync }) => {
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(post.likes || 0);
+
+  const toggleLike = () => {
+    if (isLiked) {
+      setIsLiked(false);
+      setLikesCount(prev => prev - 1);
+      if (onLikeSync) onLikeSync(post.id, likesCount - 1, false);
+    } else {
+      setIsLiked(true);
+      setLikesCount(prev => prev + 1);
+      if (onLikeSync) onLikeSync(post.id, likesCount + 1, true);
+    }
+  };
+
+  return (
+    <div className="relative w-full h-full snap-start bg-black flex items-center justify-center overflow-hidden">
+      <img src={post.media_url} alt={post.caption || 'Post'} className="w-full h-full object-contain" />
+
+      <div className="absolute bottom-0 w-full px-4 pb-20 pt-32 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex justify-between items-end pointer-events-none z-10">
+        <div className="flex flex-col text-white gap-3 pb-2 w-[75%] pointer-events-auto">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-full border border-white/50 p-0.5 overflow-hidden">
+              <img src={post.user_profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${post.user_id}`} alt="dp" className="w-full h-full rounded-full object-cover bg-white" />
+            </div>
+            <span className="font-extrabold text-[15px]">{post.username || 'Creator'}</span>
+            {currentUser && currentUser.id !== post.user_id && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onFollowToggle(post.user_id); }}
+                className={`px-3 py-1 rounded-lg text-[12px] font-bold ml-2 transition-all active:scale-95 flex-shrink-0 ${isFollowing ? 'bg-white/20 text-white border border-white/40' : 'bg-gray-900 text-yellow-400 border border-gray-900'}`}
+              >
+                {isFollowing ? 'Following' : 'Follow'}
+              </button>
+            )}
+          </div>
+          {post.caption && <p className="text-[14px] font-medium leading-tight line-clamp-2">{post.caption}</p>}
+        </div>
+
+        <div className="flex flex-col items-center gap-5 pb-2 pointer-events-auto">
+          <div className="flex flex-col items-center gap-1 group">
+            <button onClick={toggleLike} className="active:scale-90 transition-transform">
+              <Heart className={`w-8 h-8 transition-colors ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} strokeWidth={isLiked ? 0 : 2} />
+            </button>
+            <span className="text-white text-[13px] font-extrabold">{formatCount(likesCount)}</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <button onClick={() => onOpenComments(post)} className="active:scale-90 transition-transform">
+              <MessageCircle className="w-8 h-8 text-white" strokeWidth={2} />
+            </button>
+            <span className="text-white text-[13px] font-extrabold">{formatCount(post.comments)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function ReelsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentUser, setCurrentUser] = useState(null);
   const [followedUsers, setFollowedUsers] = useState({});
-  const [reels, setReels] = useState([]);
+  const [reelsPool, setReelsPool] = useState([]);
+  const [postsPool, setPostsPool] = useState([]);
+  const [startItem, setStartItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [hasMoreReels, setHasMoreReels] = useState(true);
   const reelsOffsetRef = useRef(0);
+  const postsOffsetRef = useRef(0);
+  const postsFetchCountRef = useRef(0);
+  const postSlotsRef = useRef([]);
   const reelsSentinelRef = useRef(null);
+  const containerRef = useRef(null);
   const [commentsSheetReel, setCommentsSheetReel] = useState(null);
   const [reelComments, setReelComments] = useState({});
   const [reelCommentDrafts, setReelCommentDrafts] = useState({});
@@ -221,6 +289,7 @@ export default function ReelsPage() {
       }
 
       await fetchReels();
+      await fetchPostsForPlayer();
     };
     
     initializeReels();
@@ -242,17 +311,47 @@ export default function ReelsPage() {
       setHasMoreReels(loaded.length === REELS_PER_PAGE);
 
       if (loaded.length > 0) {
-        setReels((prev) => (loadMore ? [...prev, ...loaded] : loaded));
+        setReelsPool((prev) => (loadMore ? [...prev, ...loaded] : loaded));
       } else if (!loadMore) {
-        setReels(dummyReels);
+        setReelsPool(dummyReels);
       }
     } catch (error) {
       console.error("Error fetching reels:", error.message);
-      if (!loadMore) setReels(dummyReels);
+      if (!loadMore) setReelsPool(dummyReels);
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchPostsForPlayer = async () => {
+    try {
+      const start = postsOffsetRef.current;
+      const { data, error } = await supabase
+        .from('ranked_posts')
+        .select('*')
+        .order('rank_score', { ascending: false })
+        .range(start, start + POSTS_IN_REELS_PAGE - 1);
+      if (error) throw error;
+      const loaded = data || [];
+      postsOffsetRef.current = start + loaded.length;
+      setPostsPool((prev) => [...prev, ...loaded]);
+    } catch (err) {
+      console.error("Error fetching posts for reels:", err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (location.pathname !== '/reels') return;
+    const id = takePendingReelId();
+    if (!id) return;
+    (async () => {
+      const { data } = await supabase.from('posts').select('*').eq('id', id).maybeSingle();
+      if (data) {
+        setStartItem(data);
+        if (containerRef.current) containerRef.current.scrollTo(0, 0);
+      }
+    })();
+  }, [location.pathname]);
 
   useEffect(() => {
     const sentinel = reelsSentinelRef.current;
@@ -260,6 +359,8 @@ export default function ReelsPage() {
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasMoreReels && !loading) {
         fetchReels(true);
+        postsFetchCountRef.current++;
+        if (postsFetchCountRef.current % 3 === 0) fetchPostsForPlayer();
       }
     }, { rootMargin: '600px' });
     observer.observe(sentinel);
@@ -340,7 +441,7 @@ export default function ReelsPage() {
       return;
     }
     setReelComments((value) => ({ ...value, [reelId]: (value[reelId] || []).filter((c) => c.id !== comment.id) }));
-    setReels((value) => value.map((item) => item.id === reelId ? { ...item, comments: Math.max(0, (Number(item.comments) || 0) - 1) } : item));
+    setReelsPool((value) => value.map((item) => item.id === reelId ? { ...item, comments: Math.max(0, (Number(item.comments) || 0) - 1) } : item));
   };
 
   const startDeleteReelCommentPress = (comment) => {
@@ -365,15 +466,41 @@ export default function ReelsPage() {
     if (error) return alert(error.message);
     setReelCommentDrafts((value) => ({ ...value, [reel.id]: '' }));
     setReelComments((value) => ({ ...value, [reel.id]: [...(value[reel.id] || []), { ...data, avatar: me?.profile_pic }] }));
-    setReels((value) => value.map((item) => item.id === reel.id ? { ...item, comments: (Number(item.comments) || 0) + 1 } : item));
+    setReelsPool((value) => value.map((item) => item.id === reel.id ? { ...item, comments: (Number(item.comments) || 0) + 1 } : item));
 
     if (reel.user_id !== currentUser.id) {
       supabase.from('notifications').insert({ user_id: reel.user_id, sender_id: currentUser.id, post_id: reel.id, type: 'message', content: `commented: "${content}"` }).then();
     }
   };
 
+  const ensurePostSlots = (count) => {
+    const slots = postSlotsRef.current;
+    while (slots.length < count) {
+      slots.push(Math.random() < POSTS_IN_REELS_DENSITY);
+    }
+  };
+
+  const total = reelsPool.length + postsPool.length;
+  ensurePostSlots(total);
+  const displayItems = [];
+  let reelIdx = 0;
+  let postIdx = 0;
+  for (let i = 0; i < total; i++) {
+    const isPost = postSlotsRef.current[i] && postIdx < postsPool.length;
+    if (isPost) {
+      displayItems.push({ kind: 'post', item: postsPool[postIdx++] });
+    } else if (reelIdx < reelsPool.length) {
+      displayItems.push({ kind: 'reel', item: reelsPool[reelIdx++] });
+    }
+  }
+
+  const playerItems = [
+    ...(startItem ? [{ kind: startItem.type === 'reel' || String(startItem.media_url || '').includes('.mp4') ? 'reel' : 'post', item: startItem, start: true }] : []),
+    ...displayItems,
+  ];
+
   return (
-    <div className="bg-black w-full h-[100dvh] overflow-y-scroll snap-y snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] relative">
+    <div ref={containerRef} className="bg-black w-full h-[100dvh] overflow-y-scroll snap-y snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] relative">
       
       <div className="absolute top-0 left-0 w-full p-4 flex justify-between items-center z-20 pointer-events-none">
         <h1 className="text-2xl font-black text-white drop-shadow-md tracking-tight">Reels</h1>
@@ -389,21 +516,31 @@ export default function ReelsPage() {
             <Skeleton className="w-40 h-3 bg-gray-800" />
           </div>
         </div>
-      ) : reels.length === 0 ? (
+      ) : playerItems.length === 0 && reelsPool.length === 0 && postsPool.length === 0 ? (
         <div className="w-full h-full flex flex-col justify-center items-center text-white">
           <span className="text-4xl mb-2">🎬</span>
           <p className="font-bold">No reels yet!</p>
         </div>
       ) : (
-        reels.map((reel) => (
+        playerItems.map((entry) => entry.kind === 'reel' ? (
           <Reel 
-            key={reel.id} 
-            reel={reel} 
+            key={(entry.start ? 'start-' : '') + entry.item.id} 
+            reel={entry.item} 
             onLikeToggle={handleLikeSync} 
             currentUser={currentUser}
-            isFollowing={followedUsers[reel.user_id]}
+            isFollowing={followedUsers[entry.item.user_id]}
             onFollowToggle={handleFollowToggle}
             onOpenComments={openReelComments}
+          />
+        ) : (
+          <ReelsImage 
+            key={(entry.start ? 'start-' : '') + entry.item.id} 
+            post={entry.item} 
+            currentUser={currentUser}
+            isFollowing={followedUsers[entry.item.user_id]}
+            onFollowToggle={handleFollowToggle}
+            onOpenComments={openReelComments}
+            onLikeSync={handleLikeSync}
           />
         ))
       )}

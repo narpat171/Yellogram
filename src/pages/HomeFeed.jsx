@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Send, Bookmark, Bell, MoreHorizontal, Loader2, Upload, X, Type, Smile, Wand2, Music, AtSign, Users, Trash2, ZoomIn, ZoomOut, Download, ChevronRight } from 'lucide-react';
 import { supabase } from '../supabase'; 
+import { setPendingReelId } from '../pendingReel';
 import StoryViewer from "../components/StoryViewer";
 import Skeleton from "../components/Skeleton";
 import MusicPicker from "../components/MusicPicker";
@@ -64,7 +65,7 @@ const FeedImage = ({ src, alt, className }) => {
   );
 };
 
-const FeedReelCard = ({ reel, currentUser, isLiked, isFollowing, onLikeToggle, onOpenComments, onNavigate, onFollowToggle, onShare }) => {
+const FeedReelCard = ({ reel, currentUser, isLiked, isFollowing, onLikeToggle, onOpenComments, onNavigate, onFollowToggle, onShare, onOpenPlayer }) => {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -109,7 +110,7 @@ const FeedReelCard = ({ reel, currentUser, isLiked, isFollowing, onLikeToggle, o
         </button>
       </header>
 
-      <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center">
+      <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center cursor-pointer" onClick={() => onOpenPlayer(reel.id)}>
         <video ref={videoRef} src={reel.media_url} loop muted playsInline preload="metadata" className="w-full h-full object-cover" />
       </div>
 
@@ -549,6 +550,11 @@ export default function HomeFeed() {
     if(window.confirm("Discard your story edits?")) { setEditorOpen(false); setEditingFile(null); setMediaPreviewUrl(''); }
   };
 
+  const openReelsPlayer = (id) => {
+    setPendingReelId(id);
+    navigate('/reels');
+  };
+
   const myStoryGroup = groupedStoriesList.find(g => g.user_id === currentUser?.id);
   const displayStoryGroups = groupedStoriesList.filter(g => g.user_id !== currentUser?.id);
 
@@ -744,6 +750,7 @@ export default function HomeFeed() {
                 onNavigate={(uid) => navigate(`/profile/${uid}`)}
                 onFollowToggle={toggleFollow}
                 onShare={handleShare}
+                onOpenPlayer={openReelsPlayer}
               />
             ) : (
             <article key={post.id} className="bg-white border-b border-gray-200 mb-2 w-full">
@@ -782,7 +789,9 @@ export default function HomeFeed() {
                 </button>
               </header>
 
-              <FeedImage src={post.media_url} alt={post.caption || 'Post'} className="w-full aspect-square" />
+              <div className="cursor-pointer" onClick={() => openReelsPlayer(post.id)}>
+                <FeedImage src={post.media_url} alt={post.caption || 'Post'} className="w-full aspect-square" />
+              </div>
 
               <div className="px-4 pt-3 pb-4">
                 <div className="flex items-center gap-4 mb-3">
