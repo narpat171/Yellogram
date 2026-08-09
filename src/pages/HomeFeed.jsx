@@ -46,6 +46,8 @@ const DraggableItem = ({ item, updateItem, removeItem }) => {
 };
 
 const POSTS_PER_PAGE = 20;
+const REELS_IN_FEED_INTERVAL = 5;
+const REELS_IN_FEED_PAGE = 10;
 
 const FeedImage = ({ src, alt, className }) => {
   const [loaded, setLoaded] = useState(false);
@@ -62,14 +64,90 @@ const FeedImage = ({ src, alt, className }) => {
   );
 };
 
+const FeedReelCard = ({ reel, currentUser, isLiked, isFollowing, onLikeToggle, onOpenComments, onNavigate, onFollowToggle, onShare }) => {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          video.play().catch(() => {});
+        } else {
+          video.pause();
+        }
+      });
+    }, { threshold: 0.6 });
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <article className="bg-white border-b border-gray-200 mb-2 w-full">
+      <header className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3 min-w-0 cursor-pointer active:opacity-70 transition-opacity" onClick={() => onNavigate(reel.user_id)}>
+          <img
+            src={reel.users?.profile_pic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${reel.user_id}`}
+            alt=""
+            className="h-10 w-10 rounded-lg object-cover bg-gray-100"
+          />
+          <span className="font-bold mr-1 cursor-pointer hover:underline">{reel.users?.username || reel.username || 'User'}</span>
+          {reel.user_id !== currentUser?.id && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onFollowToggle(reel.user_id); }}
+              className={`ml-1 px-3 py-1 rounded-lg text-[12px] font-bold transition-all active:scale-95 flex-shrink-0 ${
+                isFollowing ? 'bg-gray-100 text-gray-500' : 'bg-gray-900 text-yellow-400'
+              }`}
+            >
+              {isFollowing ? 'Following' : 'Follow'}
+            </button>
+          )}
+        </div>
+        <button type="button" className="p-1 text-gray-700" aria-label="Reel options">
+          <MoreHorizontal className="h-5 w-5" />
+        </button>
+      </header>
+
+      <div className="relative w-full aspect-[9/16] bg-black flex items-center justify-center">
+        <video ref={videoRef} src={reel.media_url} loop muted playsInline preload="metadata" className="w-full h-full object-cover" />
+      </div>
+
+      <div className="px-4 pt-3 pb-4">
+        <div className="flex items-center gap-4 mb-3">
+          <button type="button" onClick={() => onLikeToggle(reel)} className={`flex items-center gap-1.5 ${isLiked ? 'text-red-500' : 'text-gray-900'}`} aria-label="Like reel">
+            <Heart className="h-6 w-6" fill={isLiked ? 'currentColor' : 'none'} />
+            <span className="text-sm font-bold">{Number(reel.likes) || 0}</span>
+          </button>
+          <button type="button" onClick={() => onOpenComments(reel)} className="flex items-center gap-1.5 text-gray-900" aria-label="Comment on reel">
+            <MessageCircle className="h-6 w-6" />
+            <span className="text-sm font-bold">{Number(reel.comments) || 0}</span>
+          </button>
+          <button type="button" onClick={() => onShare(reel)} className="flex items-center gap-1.5 text-gray-900" aria-label="Share reel">
+            <Send className="h-6 w-6" />
+          </button>
+        </div>
+        {reel.caption && (
+          <p className="text-sm break-words">
+            <span className="font-bold mr-1 cursor-pointer hover:underline" onClick={() => onNavigate(reel.user_id)}>{reel.users?.username || reel.username || 'User'}</span>
+            {reel.caption}
+          </p>
+        )}
+      </div>
+    </article>
+  );
+};
+
 export default function HomeFeed() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [myProfilePic, setMyProfilePic] = useState('');
   const [posts, setPosts] = useState([]);
+  const [reels, setReels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const feedOffsetRef = useRef(0);
+  const reelsOffsetRef = useRef(0);
   const feedSentinelRef = useRef(null);
   const [feedError, setFeedError] = useState('');
   const [followedUsers, setFollowedUsers] = useState({});
@@ -212,6 +290,30 @@ export default function HomeFeed() {
     } catch (err) { console.error("Error fetching stories:", err); }
   };
 
+  const fetchReels = async () => {
+    try {
+      const start = reelsOffsetRef.current;
+      const { data, error } = await supabase
+        .from('ranked_reels')
+        .select('*')
+        .order('rank_score', { ascending: false })
+        .range(start, start + REELS_IN_FEED_PAGE - 1);
+      if (error) throw error;
+      const loadedReels = data || [];
+      reelsOffsetRef.current = start + loadedReels.length;
+
+      const userIds = [...new Set(loadedReels.map((reel) => reel.user_id).filter(Boolean))];
+      const { data: userRows } = userIds.length
+        ? await supabase.from('users').select('id, username, profile_pic').in('id', userIds)
+        : { data: [] };
+      const userMap = Object.fromEntries((userRows || []).map((u) => [u.id, u]));
+
+      setReels((prev) => [...prev, ...loadedReels.map((reel) => ({ ...reel, users: userMap[reel.user_id] }))]);
+    } catch (err) {
+      console.error('Could not load reels:', err);
+    }
+  };
+
   const fetchPosts = async (viewer = currentUser, loadMore = false) => {
     try {
       setFeedError('');
@@ -244,6 +346,9 @@ export default function HomeFeed() {
         const { data: mySaves } = await supabase.from('saved_posts').select('post_id').eq('user_id', viewer.id).in('post_id', postIds);
         setSavedPosts((prev) => ({ ...prev, ...Object.fromEntries((mySaves || []).map((save) => [save.post_id, true])) }));
       }
+
+      const reelsNeeded = Math.ceil(feedOffsetRef.current / REELS_IN_FEED_INTERVAL) + 2;
+      if (reels.length < reelsNeeded) await fetchReels();
     } catch (error) {
       console.error('Could not load posts:', error);
       if (!loadMore) {
@@ -262,6 +367,7 @@ export default function HomeFeed() {
 
     setLikedPosts((value) => ({ ...value, [post.id]: !wasLiked }));
     setPosts((value) => value.map((item) => item.id === post.id ? { ...item, likes: Math.max(0, previousLikes + (wasLiked ? -1 : 1)) } : item));
+    setReels((value) => value.map((item) => item.id === post.id ? { ...item, likes: Math.max(0, previousLikes + (wasLiked ? -1 : 1)) } : item));
 
     const request = wasLiked
       ? supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', currentUser.id)
@@ -271,6 +377,7 @@ export default function HomeFeed() {
     if (error) {
       setLikedPosts((value) => ({ ...value, [post.id]: wasLiked }));
       setPosts((value) => value.map((item) => item.id === post.id ? { ...item, likes: previousLikes } : item));
+      setReels((value) => value.map((item) => item.id === post.id ? { ...item, likes: previousLikes } : item));
       alert(error.message);
     } else if (!wasLiked && post.user_id !== currentUser.id) {
       supabase.from('notifications').insert({ user_id: post.user_id, sender_id: currentUser.id, post_id: post.id, type: 'like', content: 'liked your post.' }).then();
@@ -443,6 +550,15 @@ export default function HomeFeed() {
   const myStoryGroup = groupedStoriesList.find(g => g.user_id === currentUser?.id);
   const displayStoryGroups = groupedStoriesList.filter(g => g.user_id !== currentUser?.id);
 
+  const feedItems = [];
+  let reelIndex = 0;
+  posts.forEach((post, index) => {
+    if (index > 0 && index % REELS_IN_FEED_INTERVAL === 0 && reelIndex < reels.length) {
+      feedItems.push({ kind: 'reel', reel: reels[reelIndex++] });
+    }
+    feedItems.push({ kind: 'post', post });
+  });
+
   return (
     <div className="w-full bg-gray-50 min-h-screen pb-24 relative">
       <div className="bg-white p-4 sticky top-0 z-20 shadow-sm border-b border-gray-100 flex justify-between items-center rounded-b-[20px]">
@@ -601,10 +717,25 @@ export default function HomeFeed() {
           </div>
         ) : feedError ? (
           <div className="flex flex-col items-center justify-center py-20 px-6 text-center text-red-600"><p className="font-bold">Posts load नहीं हो पाए</p><p className="mt-1 text-sm">{feedError}</p></div>
-        ) : posts.length === 0 ? (
+        ) : posts.length === 0 && reels.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-500"><p className="font-bold">No posts yet!</p></div>
         ) : (
-          posts.map((post) => (
+          feedItems.map((item) => {
+            const post = item.post;
+            return item.kind === 'reel' ? (
+              <FeedReelCard
+                key={item.reel.id}
+                reel={item.reel}
+                currentUser={currentUser}
+                isLiked={Boolean(likedPosts[item.reel.id])}
+                isFollowing={Boolean(followedUsers[item.reel.user_id])}
+                onLikeToggle={toggleLike}
+                onOpenComments={openCommentSheet}
+                onNavigate={(uid) => navigate(`/profile/${uid}`)}
+                onFollowToggle={toggleFollow}
+                onShare={handleShare}
+              />
+            ) : (
             <article key={post.id} className="bg-white border-b border-gray-200 mb-2 w-full">
               <header className="flex items-center justify-between px-4 py-3">
                 <div 
@@ -677,7 +808,8 @@ export default function HomeFeed() {
                 )}
               </div>
             </article>
-          ))
+            );
+          })
         )}
 
         {hasMorePosts && (
