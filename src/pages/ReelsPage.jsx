@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Music, Volume2, VolumeX, Camera, X } from 'lucide-react';
 import { supabase } from '../supabase'; 
 import Skeleton from '../components/Skeleton';
@@ -188,6 +189,7 @@ const Reel = ({ reel, onLikeToggle, currentUser, isFollowing, onFollowToggle, on
 
 // 🔥 Main Reels Page Component 🔥
 export default function ReelsPage() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [followedUsers, setFollowedUsers] = useState({});
   const [reels, setReels] = useState([]);
@@ -327,14 +329,16 @@ export default function ReelsPage() {
     const content = (reelCommentDrafts[reel.id] || '').trim();
     if (!content) return;
     if (!currentUser) return alert('Please log in to comment.');
+    const { data: me } = await supabase.from('users').select('username, profile_pic').eq('id', currentUser.id).maybeSingle();
+    const username = me?.username || currentUser.email?.split('@')[0] || 'User';
 
     const { data, error } = await supabase.from('post_comments').insert({
-      post_id: reel.id, user_id: currentUser.id, username: currentUser.email?.split('@')[0] || 'User', content,
+      post_id: reel.id, user_id: currentUser.id, username, content,
     }).select().single();
 
     if (error) return alert(error.message);
     setReelCommentDrafts((value) => ({ ...value, [reel.id]: '' }));
-    setReelComments((value) => ({ ...value, [reel.id]: [...(value[reel.id] || []), { ...data, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.id}` }] }));
+    setReelComments((value) => ({ ...value, [reel.id]: [...(value[reel.id] || []), { ...data, avatar: me?.profile_pic }] }));
     setReels((value) => value.map((item) => item.id === reel.id ? { ...item, comments: (Number(item.comments) || 0) + 1 } : item));
 
     if (reel.user_id !== currentUser.id) {
@@ -393,9 +397,9 @@ export default function ReelsPage() {
                   onPointerCancel={() => clearTimeout(deleteCommentTimerRef.current)}
                   onPointerLeave={() => clearTimeout(deleteCommentTimerRef.current)}
                 >
-                  <img src={comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`} alt="" className="h-9 w-9 rounded-full object-cover bg-gray-100" />
+                  <img src={comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`} alt="" className="h-9 w-9 rounded-full object-cover bg-gray-100 cursor-pointer" onClick={() => navigate(`/profile/${comment.user_id}`)} />
                   <div className="flex-1 min-w-0">
-                    <span className="font-bold text-sm mr-1">{comment.username || 'User'}</span>
+                    <span className="font-bold text-sm mr-1 cursor-pointer hover:underline" onClick={() => navigate(`/profile/${comment.user_id}`)}>{comment.username || 'User'}</span>
                     <span className="text-sm text-gray-800 break-words">{comment.content}</span>
                   </div>
                 </div>
