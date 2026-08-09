@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Send, Bookmark, Bell, MoreHorizontal, Loader2, Plus, X, Type, Smile, Wand2, Music, AtSign, Users, Trash2, ZoomIn, ZoomOut, Download, ChevronRight } from 'lucide-react';
+import { Heart, MessageCircle, Send, Bookmark, Bell, MoreHorizontal, Loader2, Upload, X, Type, Smile, Wand2, Music, AtSign, Users, Trash2, ZoomIn, ZoomOut, Download, ChevronRight } from 'lucide-react';
 import { supabase } from '../supabase'; 
 import StoryViewer from "../components/StoryViewer";
 import Skeleton from "../components/Skeleton";
@@ -405,7 +405,7 @@ export default function HomeFeed() {
                   style={{ background: 'conic-gradient(from 270deg, transparent 0deg, rgba(250,204,21,1) 80deg, transparent 160deg)', animationDuration: '1.2s' }} />
               )}
               <label onClick={(e) => e.stopPropagation()} className="absolute -bottom-2 -right-2 bg-yellow-400 rounded-lg w-7 h-7 border-2 border-white shadow-sm active:scale-90 transition-transform cursor-pointer flex items-center justify-center" aria-label="Add story">
-                {uploadingStory ? <Loader2 className="w-3.5 h-3.5 text-gray-900 animate-spin" /> : <Plus className="w-3.5 h-3.5 text-gray-900" strokeWidth={3} />}
+                {uploadingStory ? <Loader2 className="w-3.5 h-3.5 text-gray-900 animate-spin" /> : <Upload className="w-3.5 h-3.5 text-gray-900" strokeWidth={3} />}
                 <input type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
               </label>
             </div>
