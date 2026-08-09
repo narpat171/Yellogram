@@ -48,6 +48,7 @@ const DraggableItem = ({ item, updateItem, removeItem }) => {
 export default function HomeFeed() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
+  const [myProfilePic, setMyProfilePic] = useState('');
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [feedError, setFeedError] = useState('');
@@ -110,6 +111,8 @@ export default function HomeFeed() {
 
       let followingDict = {};
       if (user) {
+        const { data: profileRow } = await supabase.from('users').select('profile_pic').eq('id', user.id).maybeSingle();
+        setMyProfilePic(profileRow?.profile_pic || '');
         const { data: myData } = await supabase.from('users').select('following').eq('id', user.id).single();
         if (myData?.following) {
           myData.following.forEach(id => { followingDict[id] = true; });
@@ -345,6 +348,8 @@ export default function HomeFeed() {
     if(window.confirm("Discard your story edits?")) { setEditorOpen(false); setEditingFile(null); setMediaPreviewUrl(''); }
   };
 
+  const myStoryGroup = groupedStoriesList.find(g => g.user_id === currentUser?.id);
+
   return (
     <div className="w-full bg-gray-50 min-h-screen pb-24 relative">
       <div className="bg-white p-4 sticky top-0 z-20 shadow-sm border-b border-gray-100 flex justify-between items-center rounded-b-[20px]">
@@ -374,12 +379,26 @@ export default function HomeFeed() {
       </div>
 
       <div className="bg-white pt-4 pb-3 px-3 border-b border-gray-200 flex gap-4 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0" onClick={() => fileInputRef.current?.click()}>
-          <div className="w-[75px] h-[75px] rounded-2xl border border-gray-200 bg-gray-50 relative flex items-center justify-center p-[2px]">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=currentUser" alt="Your Story" className="w-full h-full rounded-[14px] object-cover opacity-90 bg-gray-100" />
-            <div className="absolute -bottom-1 -right-1 bg-yellow-400 rounded-lg p-1 border-2 border-white shadow-sm">
-              {uploadingStory ? <Loader2 className="w-4 h-4 text-gray-900 animate-spin" /> : <Plus className="w-4 h-4 text-gray-900 font-bold" strokeWidth={3} />}
-            </div>
+        <div className="flex flex-col items-center gap-1 cursor-pointer flex-shrink-0 group" onClick={() => {
+          if (myStoryGroup) {
+            const idx = groupedStoriesList.findIndex(g => g.user_id === currentUser?.id);
+            setSelectedUserIndex(idx);
+            setViewerOpen(true);
+          } else {
+            fileInputRef.current?.click();
+          }
+        }}>
+          <div className={`w-[75px] h-[75px] rounded-2xl border-[3px] p-[2px] bg-white group-hover:scale-95 transition-transform ${myStoryGroup ? (myStoryGroup.items.every((story) => viewedStoryIds[story.id]) ? 'border-gray-300' : 'border-yellow-400') : 'border-gray-200'}`}>
+            {myStoryGroup ? (
+              <img src={myStoryGroup.items[0].media_url} alt="Your Story" className="w-full h-full rounded-[12px] object-cover bg-gray-100" />
+            ) : (
+              <div className="relative w-full h-full">
+                <img src={myProfilePic || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser?.id || 'currentUser'}`} alt="Your Story" className="w-full h-full rounded-[12px] object-cover bg-gray-100" />
+                <div className="absolute -bottom-1 -right-1 bg-yellow-400 rounded-lg p-1 border-2 border-white shadow-sm">
+                  {uploadingStory ? <Loader2 className="w-4 h-4 text-gray-900 animate-spin" /> : <Plus className="w-4 h-4 text-gray-900 font-bold" strokeWidth={3} />}
+                </div>
+              </div>
+            )}
           </div>
           <input type="file" ref={fileInputRef} accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
           <span className="text-[12px] font-bold text-gray-500 mt-1">Your story</span>
