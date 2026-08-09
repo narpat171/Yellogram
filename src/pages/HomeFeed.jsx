@@ -45,6 +45,21 @@ const DraggableItem = ({ item, updateItem, removeItem }) => {
   );
 };
 
+const FeedImage = ({ src, alt, className }) => {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className={`relative overflow-hidden bg-gray-100 ${className}`}>
+      <img
+        src={src}
+        alt={alt || ''}
+        loading="lazy"
+        onLoad={() => setLoaded(true)}
+        className={`w-full h-full object-cover transition-opacity duration-500 ease-out ${loaded ? 'opacity-100' : 'opacity-0'}`}
+      />
+    </div>
+  );
+};
+
 export default function HomeFeed() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
@@ -601,12 +616,7 @@ export default function HomeFeed() {
                 </button>
               </header>
 
-              <img
-                src={post.media_url}
-                alt={post.caption || 'Post'}
-                className="block w-full aspect-square object-cover bg-gray-100"
-                loading="lazy"
-              />
+              <FeedImage src={post.media_url} alt={post.caption || 'Post'} className="w-full aspect-square" />
 
               <div className="px-4 pt-3 pb-4">
                 <div className="flex items-center gap-4 mb-3">
