@@ -55,7 +55,7 @@ export default function HomeFeed() {
   const [followedUsers, setFollowedUsers] = useState({});
   const [likedPosts, setLikedPosts] = useState({});
   const [savedPosts, setSavedPosts] = useState({}); // 🔥 SAVED POSTS STATE
-  const [openComments, setOpenComments] = useState({});
+  const [commentsSheetPost, setCommentsSheetPost] = useState(null);
   const [commentsByPost, setCommentsByPost] = useState({});
   const [commentDrafts, setCommentDrafts] = useState({});
   
@@ -304,13 +304,18 @@ export default function HomeFeed() {
   const loadComments = async (postId) => {
     const { data, error } = await supabase.from('post_comments').select('*').eq('post_id', postId).order('created_at', { ascending: true });
     if (error) return alert(error.message);
-    setCommentsByPost((value) => ({ ...value, [postId]: data || [] }));
+    const comments = data || [];
+    const userIds = [...new Set(comments.map((comment) => comment.user_id).filter(Boolean))];
+    const { data: userRows } = userIds.length
+      ? await supabase.from('users').select('id, profile_pic').in('id', userIds)
+      : { data: [] };
+    const picMap = Object.fromEntries((userRows || []).map((user) => [user.id, user.profile_pic]));
+    setCommentsByPost((value) => ({ ...value, [postId]: comments.map((comment) => ({ ...comment, avatar: picMap[comment.user_id] })) }));
   };
 
-  const toggleComments = (postId) => {
-    const willOpen = !openComments[postId];
-    setOpenComments((value) => ({ ...value, [postId]: willOpen }));
-    if (willOpen) loadComments(postId);
+  const openCommentSheet = (post) => {
+    setCommentsSheetPost(post);
+    loadComments(post.id);
   };
 
   const submitComment = async (event, post) => {
@@ -325,7 +330,7 @@ export default function HomeFeed() {
 
     if (error) return alert(error.message);
     setCommentDrafts((value) => ({ ...value, [post.id]: '' }));
-    setCommentsByPost((value) => ({ ...value, [post.id]: [...(value[post.id] || []), data] }));
+    setCommentsByPost((value) => ({ ...value, [post.id]: [...(value[post.id] || []), { ...data, avatar: currentUser?.profilePic }] }));
     setPosts((value) => value.map((item) => item.id === post.id ? { ...item, comments: (Number(item.comments) || 0) + 1 } : item));
       
     if (post.user_id !== currentUser.id) {
@@ -584,7 +589,7 @@ export default function HomeFeed() {
                     <Heart className="h-6 w-6" fill={likedPosts[post.id] ? 'currentColor' : 'none'} />
                     <span className="text-sm font-bold">{Number(post.likes) || 0}</span>
                   </button>
-                  <button type="button" onClick={() => toggleComments(post.id)} className="flex items-center gap-1.5 text-gray-900" aria-label="Comment on post">
+                  <button type="button" onClick={() => openCommentSheet(post)} className="flex items-center gap-1.5 text-gray-900" aria-label="Comment on post">
                     <MessageCircle className="h-6 w-6" />
                     <span className="text-sm font-bold">{Number(post.comments) || 0}</span>
                   </button>
@@ -610,25 +615,40 @@ export default function HomeFeed() {
                     {post.caption}
                   </p>
                 )}
-                {Number(post.comments) > 0 && !openComments[post.id] && (
-                  <button type="button" onClick={() => toggleComments(post.id)} className="mt-2 text-sm text-gray-500">View {post.comments} comments</button>
-                )}
-                {openComments[post.id] && (
-                  <section className="mt-3 border-t border-gray-100 pt-3">
-                    {(commentsByPost[post.id] || []).map((comment) => (
-                      <p key={comment.id} className="mb-2 text-sm break-words"><span className="font-bold mr-1">{comment.username || 'User'}</span>{comment.content}</p>
-                    ))}
-                    <form onSubmit={(event) => submitComment(event, post)} className="flex gap-2 mt-2">
-                      <input value={commentDrafts[post.id] || ''} onChange={(event) => setCommentDrafts((value) => ({ ...value, [post.id]: event.target.value }))} maxLength={1000} placeholder="Add a comment..." className="min-w-0 flex-1 rounded-full bg-gray-100 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
-                      <button type="submit" className="font-bold text-sm text-blue-600 disabled:text-gray-400" disabled={!commentDrafts[post.id]?.trim()}>Post</button>
-                    </form>
-                  </section>
-                )}
               </div>
             </article>
           ))
         )}
       </div>
+
+      {commentsSheetPost !== null && (
+        <div className="fixed inset-0 z-[210] bg-black/60 flex items-end justify-center" onClick={() => setCommentsSheetPost(null)}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl flex flex-col max-h-[80vh] animate-in slide-in-from-bottom-full duration-300" onClick={(event) => event.stopPropagation()}>
+            <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-black text-gray-900">{Number(commentsSheetPost.comments) || 0} comments</h3>
+              <button onClick={() => setCommentsSheetPost(null)} className="p-1 active:scale-90 transition-transform" aria-label="Close comments"><X className="w-6 h-6 text-gray-500" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3">
+              {(commentsByPost[commentsSheetPost.id] || []).map((comment) => (
+                <div key={comment.id} className="flex items-start gap-3 py-2.5">
+                  <img src={comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.user_id}`} alt="" className="h-9 w-9 rounded-full object-cover bg-gray-100" />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-bold text-sm mr-1">{comment.username || 'User'}</span>
+                    <span className="text-sm text-gray-800 break-words">{comment.content}</span>
+                  </div>
+                </div>
+              ))}
+              {(commentsByPost[commentsSheetPost.id] || []).length === 0 && <p className="py-8 text-center text-gray-400 font-bold">No comments yet</p>}
+            </div>
+            <div className="border-t border-gray-100 px-4 py-3">
+              <form onSubmit={(event) => submitComment(event, commentsSheetPost)} className="flex items-center gap-2">
+                <input value={commentDrafts[commentsSheetPost.id] || ''} onChange={(event) => setCommentDrafts((value) => ({ ...value, [commentsSheetPost.id]: event.target.value }))} maxLength={1000} placeholder="Add a comment..." autoFocus className="flex-1 rounded-full bg-gray-100 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-yellow-400" />
+                <button type="submit" className="font-bold text-sm text-blue-600 disabled:text-gray-400" disabled={!commentDrafts[commentsSheetPost.id]?.trim()}>Post</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {viewerOpen && groupedStoriesList.length > 0 && (
         <StoryViewer 
