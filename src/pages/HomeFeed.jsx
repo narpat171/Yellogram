@@ -404,8 +404,8 @@ export default function HomeFeed() {
                 <div className="absolute -inset-[6px] rounded-2xl pointer-events-none animate-spin"
                   style={{ background: 'conic-gradient(from 270deg, transparent 0deg, rgba(250,204,21,1) 80deg, transparent 160deg)', animationDuration: '1.2s' }} />
               )}
-              <label onClick={(e) => e.stopPropagation()} className="absolute -bottom-2 -right-1 bg-yellow-400 rounded-lg p-1.5 border-2 border-white shadow-sm active:scale-90 transition-transform cursor-pointer flex items-center justify-center" aria-label="Add story">
-                {uploadingStory ? <Loader2 className="w-4 h-4 text-gray-900 animate-spin" /> : <Plus className="w-4 h-4 text-gray-900 font-bold" strokeWidth={3} />}
+              <label onClick={(e) => e.stopPropagation()} className="absolute -bottom-2 -right-2 bg-yellow-400 rounded-lg w-7 h-7 border-2 border-white shadow-sm active:scale-90 transition-transform cursor-pointer flex items-center justify-center" aria-label="Add story">
+                {uploadingStory ? <Loader2 className="w-3.5 h-3.5 text-gray-900 animate-spin" /> : <Plus className="w-3.5 h-3.5 text-gray-900" strokeWidth={3} />}
                 <input type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
               </label>
             </div>
