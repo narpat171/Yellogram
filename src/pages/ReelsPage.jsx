@@ -195,6 +195,7 @@ export default function ReelsPage() {
   const [commentsSheetReel, setCommentsSheetReel] = useState(null);
   const [reelComments, setReelComments] = useState({});
   const [reelCommentDrafts, setReelCommentDrafts] = useState({});
+  const [pendingDeleteComment, setPendingDeleteComment] = useState(null);
 
   useEffect(() => {
     const initializeReels = async () => {
@@ -304,8 +305,10 @@ export default function ReelsPage() {
 
   const deleteCommentTimerRef = useRef(null);
 
-  const deleteReelComment = async (reelId, comment) => {
-    if (!window.confirm('Delete this comment?')) return;
+  const confirmDeleteReelComment = async () => {
+    if (!pendingDeleteComment) return;
+    const { reelId, comment } = pendingDeleteComment;
+    setPendingDeleteComment(null);
     const { error } = await supabase.from('post_comments').delete().eq('id', comment.id);
     if (error) return alert(error.message);
     setReelComments((value) => ({ ...value, [reelId]: (value[reelId] || []).filter((c) => c.id !== comment.id) }));
@@ -314,7 +317,9 @@ export default function ReelsPage() {
 
   const startDeleteReelCommentPress = (comment) => {
     if (comment.user_id !== currentUser?.id) return;
-    deleteCommentTimerRef.current = setTimeout(() => deleteReelComment(commentsSheetReel.id, comment), 500);
+    deleteCommentTimerRef.current = setTimeout(() => {
+      setPendingDeleteComment({ reelId: commentsSheetReel.id, comment });
+    }, 500);
   };
 
   const submitReelComment = async (event, reel) => {
@@ -403,6 +408,16 @@ export default function ReelsPage() {
                 <button type="submit" className="font-bold text-sm text-blue-600 disabled:text-gray-400" disabled={!reelCommentDrafts[commentsSheetReel.id]?.trim()}>Post</button>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteComment && (
+        <div className="fixed inset-0 z-[400] bg-black/50 flex items-center justify-center p-6" onClick={() => setPendingDeleteComment(null)}>
+          <div className="w-full max-w-xs bg-white rounded-2xl overflow-hidden shadow-2xl animate-in zoom-in duration-200" onClick={(event) => event.stopPropagation()}>
+            <p className="px-5 pt-5 pb-3 text-center font-bold text-gray-900">Delete this comment?</p>
+            <button onClick={confirmDeleteReelComment} className="w-full border-t border-gray-100 py-3 font-bold text-red-500 active:bg-red-50">Delete</button>
+            <button onClick={() => setPendingDeleteComment(null)} className="w-full border-t border-gray-100 py-3 font-bold text-gray-900 active:bg-gray-50">Cancel</button>
           </div>
         </div>
       )}
